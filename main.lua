@@ -21,13 +21,22 @@ end
 function love.update(dt)
   dx = 0
   dy = 0
-  if love.keyboard.isDown("h") then dy = -dt end
-  if love.keyboard.isDown("i") then dy = dt end
-  if love.keyboard.isDown("l") then dx = -dt end
-  if love.keyboard.isDown("o") then dx = dt end
+  if love.keyboard.isDown("up") then dy = -dt end
+  if love.keyboard.isDown("down") then dy = dt end
+  if love.keyboard.isDown("left") then dx = -dt end
+  if love.keyboard.isDown("right") then dx = dt end
   Zanim:update(dt)
   px = px + (dx * 100)
   py = py + (dy * 100)
+
+  if love.mouse.isDown(1) then
+		px, py = love.mouse.getPosition()
+	end
+
+  local touches = love.touch.getTouches()
+  for i, id in ipairs(touches) do
+    px, py = love.touch.getPosition(id)
+  end
 end
 
 
@@ -35,6 +44,6 @@ end
 function love.draw()
   love.graphics.print("Brains!", px + 35, py - 35)
 
-  Zanim:draw(zombieSheet, px, py)
+  Zanim:draw(zombieSheet, px, py, 0, 2.0) -- rotation, scale
   --love.graphics.draw(zombSheet,zquad, 30 + (10 * math.cos(fh*4)), 20 + (10 * math.sin(fh*4)))
 end

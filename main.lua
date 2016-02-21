@@ -3,21 +3,25 @@ local anim8 = require 'anim8'
 -- https://github.com/rxi/flux
 local flux = require "flux"
 
-local zombieSheet, Zanim, px, py, dx, dy
-local swidth, sheight
+local zombieSheet, playerSheet, Zanim, Panim
 
-local zombie = {x=100, y=100, hx=100, hy=100, cx=100, cy=100} -- position, heading, cell
+local smallfont
+local zombie = {x=100, y=100, hx=100, hy=100, cx=3, cy=3} -- position, heading, cell
+local player = {x=300, y=100, hx=300, hy=100, cx=9, cy=3} -- position, heading, cell
 
 -- Load non dynamic values
 function love.load()
-  fh = 0
-  zombieSheet = love.graphics.newImage("zombie.png");
-  local g = anim8.newGrid(41, 41, zombieSheet:getWidth(), zombieSheet:getHeight(), 7, 22)
-  Zanim = anim8.newAnimation(g('1-2',1), 0.4)
-  --zquad = love.graphics.newQuad(7, 22, 41, 41, zombSheet:getDimensions())
-  dx = 0
-  dy = 0
-  swidth, sheight = love.graphics.getDimensions()
+  smallfont = love.graphics.newImageFont("smallfont.png",
+    " abcdefghijklmnopqrstuvwxyz" ..
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ0" ..
+    "123456789.,!?-+/():;%&`'*#=[]\"")
+  zombieSheet = love.graphics.newImage("zombie.png")
+  playerSheet = love.graphics.newImage("player.png")
+  local zg = anim8.newGrid(41, 41, zombieSheet:getWidth(), zombieSheet:getHeight(), 7, 22)
+  Zanim = anim8.newAnimation(zg('1-2',1), 0.2)
+
+  local pg = anim8.newGrid(26, 37, playerSheet:getWidth(), playerSheet:getHeight(), 430, 253)
+  Panim = anim8.newAnimation(pg('1-4',1), 0.1)
 end
 
 function love.keypressed(k)
@@ -26,30 +30,38 @@ function love.keypressed(k)
 	end
 end
 
--- Update, with frame time in fractional seconds
-function love.update(dt)
+function updateAnimations(dt)
   flux.update(dt)
-  dx = 0
-  dy = 0
-  if love.keyboard.isDown("up") then dy = -dt end
-  if love.keyboard.isDown("down") then dy = dt end
-  if love.keyboard.isDown("left") then dx = -dt end
-  if love.keyboard.isDown("right") then dx = dt end
   Zanim:update(dt)
-  zombie.x = zombie.x + (dx * 100)
-  zombie.y = zombie.y + (dy * 100)
+  Panim:update(dt)
+end
 
+local input = {up=false, down=false, left=false, right=false, action=false}
+function readInputs()
+  input.up = love.keyboard.isDown("up")
+  input.down = love.keyboard.isDown("down")
+  input.left = love.keyboard.isDown("left")
+  input.right = love.keyboard.isDown("right")
+  input.action = love.keyboard.isDown("lctrl")
+
+  -- todo: if press in a special area, that input goes true
   if love.mouse.isDown(1) then
-    zombie.hx, zombie.hy = love.mouse.getPosition()
-    startMove(zombie, 1.4)
+    --zombie.hx, zombie.hy = love.mouse.getPosition()
+    --startMove(zombie, 1.4)
 	end
 
   local touches = love.touch.getTouches()
   for i, id in ipairs(touches) do
-    zombie.hx, zombie.hy  = love.touch.getPosition(id)
-    startMove(zombie, 1.4)
+    --zombie.hx, zombie.hy  = love.touch.getPosition(id)
+    --startMove(zombie, 1.4)
     break
   end
+end
+
+-- Update, with frame time in fractional seconds
+function love.update(dt)
+  readInputs()
+  updateAnimations(dt)
 end
 
 function startMove(ch, dt)
@@ -62,8 +74,10 @@ end
 
 -- Draw a frame
 function love.draw()
-  love.graphics.print("Brains! "..zombie.cx..", "..zombie.cy, zombie.x + 35, zombie.y - 35)
+  love.graphics.setFont(smallfont)
+  love.graphics.print("Brains!", zombie.x + 35, zombie.y - 35)
 
   Zanim:draw(zombieSheet, zombie.x, zombie.y, 0, 2.0) -- rotation, scale
+  Panim:draw(playerSheet, player.x, player.y, 0, 2.0)
   --love.graphics.draw(zombSheet,zquad, 30 + (10 * math.cos(fh*4)), 20 + (10 * math.sin(fh*4)))
 end

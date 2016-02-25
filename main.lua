@@ -20,7 +20,11 @@ function love.load()
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ0" ..
     "123456789.,!?-+/():;%&`'*#=[]\"")
   zombieSheet = love.graphics.newImage("zombie.png")
+  zombieSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
+
   playerSheet = love.graphics.newImage("player.png")
+  playerSheet:setFilter("linear", "nearest")
+
   local zg = anim8.newGrid(41, 41, zombieSheet:getWidth(), zombieSheet:getHeight(), 7, 22)
   Zanim = anim8.newAnimation(zg('1-2',1), 0.2)
 

@@ -3,7 +3,7 @@ local anim8 = require 'anim8'
 -- https://github.com/rxi/flux
 local flux = require "flux"
 
-local zombieSheet, playerSheet, Zanim, Panim
+local zombieSheet, playerSheet, tilesetImage, Zanim, Panim
 
 local info = "?"
 
@@ -12,6 +12,81 @@ local zombie = {x=0, y=100, hx=100, hy=100, cx=3, cy=3} -- position, heading, ce
 local player = {x=300, y=100, hx=300, hy=100, cx=9, cy=3} -- position, heading, cell
 local moving = false -- is player moving?
 local buttons = {up={155, 290}, down={155, 430}, left={85, 360}, right={225, 360}, action={900,650}}
+
+local map -- stores tiledata
+local mapWidth, mapHeight -- width and height in tiles
+
+local mapX, mapY -- view x,y in tiles. can be a fractional value like 3.25.
+
+local tilesDisplayWidth, tilesDisplayHeight -- number of tiles to show
+local zoomX, zoomY
+
+local tilesetImage
+local tileSize -- size of tiles in pixels
+local tileQuads = {} -- parts of the tileset used for different tiles
+local tilesetSprite
+
+
+function setupMap()
+  mapWidth = 60
+  mapHeight = 40
+
+  map = {}
+  for x=1,mapWidth do
+    map[x] = {}
+    for y=1,mapHeight do
+      map[x][y] = love.math.random(0,3)
+    end
+  end
+end
+
+function setupMapView()
+  mapX = 1
+  mapY = 1
+  tilesDisplayWidth = 26
+  tilesDisplayHeight = 20
+
+  zoomX = 1
+  zoomY = 1
+end
+
+function setupTileset()
+  tilesetImage = love.graphics.newImage( "tileset.png" )
+  tilesetImage:setFilter("nearest", "linear") -- this "linear filter" removes some artifacts if we were to scale the tiles
+  tileSize = 32
+
+  tileQuads[0] = love.graphics.newQuad(0 * tileSize, 20 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
+  tileQuads[1] = love.graphics.newQuad(2 * tileSize, 0 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
+  tileQuads[2] = love.graphics.newQuad(4 * tileSize, 0 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
+  tileQuads[3] = love.graphics.newQuad(3 * tileSize, 9 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
+
+  tilesetBatch = love.graphics.newSpriteBatch(tilesetImage, tilesDisplayWidth * tilesDisplayHeight)
+
+  updateTilesetBatch()
+end
+
+function updateTilesetBatch()
+  tilesetBatch:clear()
+  for x=0, tilesDisplayWidth-1 do
+    for y=0, tilesDisplayHeight-1 do
+      tilesetBatch:add(tileQuads[map[x+math.floor(mapX)][y+math.floor(mapY)]],
+        x*tileSize, y*tileSize)
+    end
+  end
+  tilesetBatch:flush()
+end
+
+-- central function for moving the map
+function moveMap(dx, dy)
+  oldMapX = mapX
+  oldMapY = mapY
+  mapX = math.max(math.min(mapX + dx, mapWidth - tilesDisplayWidth), 1)
+  mapY = math.max(math.min(mapY + dy, mapHeight - tilesDisplayHeight), 1)
+  -- only update if we actually moved
+  if math.floor(mapX) ~= math.floor(oldMapX) or math.floor(mapY) ~= math.floor(oldMapY) then
+    updateTilesetBatch()
+  end
+end
 
 -- Load non dynamic values
 function love.load()
@@ -30,6 +105,10 @@ function love.load()
 
   local pg = anim8.newGrid(26, 37, playerSheet:getWidth(), playerSheet:getHeight(), 430, 253)
   Panim = anim8.newAnimation(pg('1-4',1), 0.1)
+
+  setupMap()
+  setupMapView()
+  setupTileset()
 end
 
 function love.keypressed(k)
@@ -103,9 +182,25 @@ function endMove(ch)
   ch.cy=ch.y
 end
 
+-- Sprite batch update stuff:
+--[[function updateTilesetBatch()
+  tilesetBatch:clear()
+  for x=0, tilesDisplayWidth-1 do
+    for y=0, tilesDisplayHeight-1 do
+      tilesetBatch:add(tileQuads[map[x+mapX][y+mapY] ], x*tileSize, y*tileSize)
+    end
+  end
+  tilesetBatch:flush()
+end--]]
+
 -- Draw a frame
 function love.draw()
   love.graphics.setColor(255, 255, 255, 255)
+  -- tile batch backdrop
+  love.graphics.draw(tilesetBatch,
+    math.floor(-zoomX*(mapX%1)*tileSize), math.floor(-zoomY*(mapY%1)*tileSize),
+    0, zoomX, zoomY)
+
   love.graphics.setFont(smallfont)
   love.graphics.print("Brains!", zombie.x + 35, zombie.y - 35)
   love.graphics.print(info, player.x + 35, player.y - 35)
@@ -123,4 +218,7 @@ function love.draw()
   love.graphics.circle("line", buttons.right[1], buttons.right[2], 50, 4)
   -- action
   love.graphics.circle("line", buttons.action[1], buttons.action[2], 50, 6)
+
+  -- FPS counter- always last.
+  love.graphics.print("FPS: "..love.timer.getFPS(), 10, 20)
 end

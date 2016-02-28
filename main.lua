@@ -9,7 +9,8 @@ local info = "?"
 
 local smallfont
 local zombie = {x=0, y=100, hx=100, hy=100, cx=3, cy=3} -- position, heading, cell
-local player = {x=300, y=100, hx=300, hy=100, cx=9, cy=3} -- position, heading, cell
+local player = {x=315, y=122, hx=300, hy=100, cx=9, cy=3} -- position, heading, cell
+local background = {x = 1, y = 1}
 local moving = false -- is player moving?
 local buttons = {up={155, 290}, down={155, 430}, left={85, 360}, right={225, 360}, action={900,650}}
 
@@ -76,8 +77,10 @@ function updateTilesetBatch()
   tilesetBatch:flush()
 end
 
--- central function for moving the map
+-- central function for moving the map by whole tiles
 function moveMap(dx, dy)
+  background.x = background.x - (dx * tileSize)
+  background.y = background.y - (dy * tileSize)
   oldMapX = mapX
   oldMapY = mapY
   mapX = math.max(math.min(mapX + dx, mapWidth - tilesDisplayWidth), 1)
@@ -161,18 +164,29 @@ function love.update(dt)
 end
 
 function updateControl()
-  if input.up then startMove(player, 0.4, 0, -1) end
-  if input.down then startMove(player, 0.4, 0, 1) end
-  if input.left then startMove(player, 0.4, -1, 0) end
-  if input.right then startMove(player, 0.4, 1, 0) end
+  local dx = 0
+  local dy = 0
+  if input.up then dy = -1 end
+  if input.down then dy = 1 end
+  if input.left then dx = -1 end
+  if input.right then dx = 1 end
+
+  -- Moving character over static background
+  --if (dx ~= 0 or dy ~= 0) then startMove(player, 0.4, dx, dy) end
+
+  -- static character over moving background
+  if (dx ~= 0 or dy ~= 0) then
+    if moving == true then return end
+    startMove(zombie, 0.4, -dx, -dy)
+    startMove(background, 0.4, -dx, -dy)
+  end
 
   if input.action then info = "!!!" else info = "?" end
 end
 
-function startMove(ch, duration, dx, dy)
-  if moving == true then return end
-  ch.hx = ch.x + (dx * 40)
-  ch.hy = ch.y + (dy * 40)
+function startMove(ch, duration, dx, dy, scale)
+  ch.hx = ch.x + (dx * tileSize)
+  ch.hy = ch.y + (dy * tileSize)
   moving = true
   flux.to(ch, duration, {x=ch.hx, y=ch.hy}):ease("linear"):oncomplete(endMove)
 end
@@ -182,23 +196,13 @@ function endMove(ch)
   ch.cy=ch.y
 end
 
--- Sprite batch update stuff:
---[[function updateTilesetBatch()
-  tilesetBatch:clear()
-  for x=0, tilesDisplayWidth-1 do
-    for y=0, tilesDisplayHeight-1 do
-      tilesetBatch:add(tileQuads[map[x+mapX][y+mapY] ], x*tileSize, y*tileSize)
-    end
-  end
-  tilesetBatch:flush()
-end--]]
-
 -- Draw a frame
 function love.draw()
   love.graphics.setColor(255, 255, 255, 255)
   -- tile batch backdrop
   love.graphics.draw(tilesetBatch,
-    math.floor(-zoomX*(mapX%1)*tileSize), math.floor(-zoomY*(mapY%1)*tileSize),
+    background.x + math.floor(-zoomX*(mapX%1)*tileSize),
+    background.y + math.floor(-zoomY*(mapY%1)*tileSize),
     0, zoomX, zoomY)
 
   love.graphics.setFont(smallfont)

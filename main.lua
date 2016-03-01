@@ -44,8 +44,8 @@ end
 function setupMapView()
   mapX = 1
   mapY = 1
-  tilesDisplayWidth = 26
-  tilesDisplayHeight = 20
+  tilesDisplayWidth = 40  -- screen size divided by tile size plus one
+  tilesDisplayHeight = 25
 
   zoomX = 1
   zoomY = 1
@@ -56,10 +56,10 @@ function setupTileset()
   tilesetImage:setFilter("nearest", "linear") -- this "linear filter" removes some artifacts if we were to scale the tiles
   tileSize = 32
 
-  tileQuads[0] = love.graphics.newQuad(0 * tileSize, 20 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
-  tileQuads[1] = love.graphics.newQuad(2 * tileSize, 0 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
-  tileQuads[2] = love.graphics.newQuad(4 * tileSize, 0 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
-  tileQuads[3] = love.graphics.newQuad(3 * tileSize, 9 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
+  tileQuads[0] = love.graphics.newQuad(5 * tileSize, 18 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
+  tileQuads[1] = love.graphics.newQuad(5 * tileSize, 19 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
+  tileQuads[2] = love.graphics.newQuad(6 * tileSize, 18 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
+  tileQuads[3] = love.graphics.newQuad(6 * tileSize, 19 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
 
   tilesetBatch = love.graphics.newSpriteBatch(tilesetImage, tilesDisplayWidth * tilesDisplayHeight)
 
@@ -79,12 +79,14 @@ end
 
 -- central function for moving the map by whole tiles
 function moveMap(dx, dy)
-  background.x = background.x - (dx * tileSize)
-  background.y = background.y - (dy * tileSize)
+  --background.x = background.x - (dx * tileSize)
+  --background.y = background.y - (dy * tileSize)
   oldMapX = mapX
   oldMapY = mapY
   mapX = math.max(math.min(mapX + dx, mapWidth - tilesDisplayWidth), 1)
   mapY = math.max(math.min(mapY + dy, mapHeight - tilesDisplayHeight), 1)
+  if mapX ~= oldMapX then background.x = background.x + (dx * tileSize) end
+  if mapY ~= oldMapY then background.y = background.y + (dy * tileSize) end
   -- only update if we actually moved
   if math.floor(mapX) ~= math.floor(oldMapX) or math.floor(mapY) ~= math.floor(oldMapY) then
     updateTilesetBatch()
@@ -194,6 +196,8 @@ function endMove(ch)
   moving = false
   ch.cx=ch.x
   ch.cy=ch.y
+
+  moveMap(math.floor(-background.x/tileSize), math.floor(-background.y/tileSize))
 end
 
 -- Draw a frame
@@ -201,8 +205,8 @@ function love.draw()
   love.graphics.setColor(255, 255, 255, 255)
   -- tile batch backdrop
   love.graphics.draw(tilesetBatch,
-    background.x + math.floor(-zoomX*(mapX%1)*tileSize),
-    background.y + math.floor(-zoomY*(mapY%1)*tileSize),
+     math.floor(background.x - zoomX*(mapX%1)*tileSize),
+     math.floor(background.y - zoomY*(mapY%1)*tileSize),
     0, zoomX, zoomY)
 
   love.graphics.setFont(smallfont)
@@ -213,8 +217,8 @@ function love.draw()
   Panim:draw(playerSheet, player.x, player.y, 0, 2.0)
   --love.graphics.draw(zombSheet,zquad, 30 + (10 * math.cos(fh*4)), 20 + (10 * math.sin(fh*4)))
 
-  --always last, the control outlines
-  love.graphics.setColor(255, 128, 0, 200)
+  --near last, the control outlines
+  love.graphics.setColor(0, 0, 0, 200)
   -- directions
   love.graphics.circle("line", buttons.up[1], buttons.up[2], 50, 4)
   love.graphics.circle("line", buttons.down[1], buttons.down[2], 50, 4)
@@ -224,5 +228,6 @@ function love.draw()
   love.graphics.circle("line", buttons.action[1], buttons.action[2], 50, 6)
 
   -- FPS counter- always last.
+  love.graphics.setColor(255, 128, 0, 200)
   love.graphics.print("FPS: "..love.timer.getFPS(), 10, 20)
 end

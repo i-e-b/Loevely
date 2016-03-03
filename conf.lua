@@ -1,6 +1,6 @@
 function love.conf(t)
   -- Same resolution as my phone. Independence later!
-  t.window.width = 1196
+  t.window.width = 1280
   t.window.height = 720
 
   t.window.title = "Survivor"

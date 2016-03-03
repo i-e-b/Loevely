@@ -4,7 +4,7 @@ local anim8 = require 'anim8'
 local flux = require "flux"
 
 local zombieSheet, playerSheet, tilesetImage, Zanim, Panim
-
+local screenWidth, screenHeight
 local info = "?"
 
 local smallfont
@@ -42,10 +42,11 @@ function setupMap()
 end
 
 function setupMapView()
+  tileSize = 32
   mapX = 1
   mapY = 1
-  tilesDisplayWidth = 40  -- screen size divided by tile size plus one
-  tilesDisplayHeight = 25
+  tilesDisplayWidth = math.ceil(screenWidth / tileSize) + 3
+  tilesDisplayHeight = math.ceil(screenHeight / tileSize) + 2
 
   zoomX = 1
   zoomY = 1
@@ -54,7 +55,6 @@ end
 function setupTileset()
   tilesetImage = love.graphics.newImage( "tileset.png" )
   tilesetImage:setFilter("nearest", "linear") -- this "linear filter" removes some artifacts if we were to scale the tiles
-  tileSize = 32
 
   tileQuads[0] = love.graphics.newQuad(5 * tileSize, 18 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
   tileQuads[1] = love.graphics.newQuad(5 * tileSize, 19 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
@@ -95,6 +95,7 @@ end
 
 -- Load non dynamic values
 function love.load()
+  screenWidth, screenHeight = love.graphics.getDimensions( )
   smallfont = love.graphics.newImageFont("smallfont.png",
     " abcdefghijklmnopqrstuvwxyz" ..
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ0" ..

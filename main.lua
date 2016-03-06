@@ -3,6 +3,24 @@ local anim8 = require 'anim8'
 -- https://github.com/rxi/flux
 local flux = require "flux"
 
+
+
+local b64 = require "b64"
+local testLevel = "eJytl8tOVEEQhlt8AmBBFDY4LgzKghFQTPAyeFkaQF2gIoqXaFgZRIhEo2JCIhuMbNRZIBgBb4t5BF7MvzJVoSiqzzk9sPjSc7qL/qtOd1UdqiGEquIQaFIcNnP0vAA2wRce34Ie0AfumnE8Mi9j1dAMWhStZo6ePxv9ZaU/weMYj/08jvAojEb0O8ExRcnMlTLiHwQXwXkwDO6wH7dZj9Yv8LrM/zVcZ5t74Bq4DC7x3FVQicR/HzwEj8Bj8AQ8UDwDU7z+Grxh1sD3xHEdbIFf4DdY5TVtl7WH/F5j/1OZz3lOsf3aAEtmj6V92EpOpcT/Lec5tvbKsZWcmgEvmZmccdac/4uwt25IXHm2klM1g1eHtpnFsPv+fwh760Y3x2VtKVd1Pg+AXkffq0Oypvekd7ri2LdE9ClXT7MuQfWp7Oh7dWjb0d/cp34s/h72TSjn6Ft/xWdPn+pZG7ii9v5n8PRrGedvY5K4vPOvqb3EzvYB0h9mP0fMGXnxk/45tqfafiaiv2zeM9Xlp+CPwdbzSbXmxe/V/8lI/PT+Kxz/XAPY/rcSdu6GHr2zsvG/Czu9oCgbYXdN+QF+RrC2FP9QqPdV0l8PjfWgRvvPqolF5m1dpHr3PPh1cNbsmdJ/YtgcLvFZe3Vo0fxt0f7jMa30Keco1+hbqcz6kod63urTu8vrWbFxQelTXtwCN0I9P0R/VPng6VP+xfpGHqJPd9je8/fsE/lzk32rOPrku9yT47zvCXAkQd8jllcbyuZj8PtvUT6F+j3XTIfsO+PdXdHvztE7CtpBBz979c3zyfqna0pK/F3gJDjFz1SH6Lt/KOG3/f6P9f8iHET9p/i9/l8EiWmu4O+2SPzS/6kH0/911H/Pmjk9T3P9Bxi//f7QmqJrv08GEmPPOn9PP6ap+Q944Ljq"
+testBin = b64.decode(testLevel);
+tileRawData = love.math.decompress( testBin, "zlib" )
+function tileIndex(raw, tileOffset)
+  local bz = (tileOffset * 4) - 3 -- 1 based indexing is weird
+  local idx = string.byte(raw, bz)
+  if idx == nil then return nil end
+  idx = idx + (string.byte(raw, bz+1)*256)
+  idx = idx + (string.byte(raw, bz+2)*65536)
+  idx = idx + (string.byte(raw, bz+3)*16777216)
+  return idx
+end
+
+
+
 local zombieSheet, playerSheet, tilesetImage, Zanim, Panim
 local screenWidth, screenHeight
 local info = "?"
@@ -29,49 +47,56 @@ local tilesetSprite
 
 
 function setupMap()
-  mapWidth = 60
-  mapHeight = 40
+  mapWidth = 32
+  mapHeight = 32
 
   map = {}
   for x=1,mapWidth do
     map[x] = {}
     for y=1,mapHeight do
-      map[x][y] = love.math.random(0,3)
+      map[x][y] = tileIndex(tileRawData, (y*mapWidth)+x)
     end
   end
 end
 
 function setupMapView()
-  tileSize = 32
+  tileSize = 16
   mapX = 1
   mapY = 1
-  tilesDisplayWidth = math.ceil(screenWidth / tileSize) + 3
-  tilesDisplayHeight = math.ceil(screenHeight / tileSize) + 2
+  zoomX = 2
+  zoomY = 2
 
-  zoomX = 1
-  zoomY = 1
+  tilesDisplayWidth = math.ceil(screenWidth / (tileSize*zoomX)) + 3
+  tilesDisplayHeight = math.ceil(screenHeight / (tileSize*zoomY)) + 2
+
 end
 
 function setupTileset()
-  tilesetImage = love.graphics.newImage( "tileset.png" )
-  tilesetImage:setFilter("nearest", "linear") -- this "linear filter" removes some artifacts if we were to scale the tiles
+  tilesetImage = love.graphics.newImage("ztown.png")
+  tilesetImage:setFilter("nearest", "nearest")
 
-  tileQuads[0] = love.graphics.newQuad(5 * tileSize, 18 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
-  tileQuads[1] = love.graphics.newQuad(5 * tileSize, 19 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
-  tileQuads[2] = love.graphics.newQuad(6 * tileSize, 18 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
-  tileQuads[3] = love.graphics.newQuad(6 * tileSize, 19 * tileSize, tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight())
-
-  tilesetBatch = love.graphics.newSpriteBatch(tilesetImage, tilesDisplayWidth * tilesDisplayHeight)
+  for x=0, 15 do
+    for y=0, 15 do
+      tileQuads[(y*16)+x+1] =
+        love.graphics.newQuad(
+          x * tileSize, y * tileSize,
+          tileSize, tileSize, tilesetImage:getWidth(), tilesetImage:getHeight()
+        )
+    end
+  end
+  tilesetBatch = love.graphics.newSpriteBatch(tilesetImage, (tilesDisplayWidth * tilesDisplayHeight)) -- will need 2nd set for overlay layer
 
   updateTilesetBatch()
 end
 
 function updateTilesetBatch()
   tilesetBatch:clear()
-  for x=0, tilesDisplayWidth-1 do
-    for y=0, tilesDisplayHeight-1 do
-      tilesetBatch:add(tileQuads[map[x+math.floor(mapX)][y+math.floor(mapY)]],
-        x*tileSize, y*tileSize)
+  mw = math.min(mapWidth, tilesDisplayWidth)
+  mh = math.min(mapHeight, tilesDisplayHeight)
+  for x=0, mw-1 do
+    for y=0, mh-1 do
+      toAdd = tileQuads[map[x+math.floor(mapX)][y+math.floor(mapY)]]
+      if (toAdd ~= nil) then tilesetBatch:add(toAdd,x*tileSize, y*tileSize) end
     end
   end
   tilesetBatch:flush()
@@ -85,8 +110,8 @@ function moveMap(dx, dy)
   oldMapY = mapY
   mapX = math.max(math.min(mapX + dx, mapWidth - tilesDisplayWidth), 1)
   mapY = math.max(math.min(mapY + dy, mapHeight - tilesDisplayHeight), 1)
-  if mapX ~= oldMapX then background.x = background.x + (dx * tileSize) end
-  if mapY ~= oldMapY then background.y = background.y + (dy * tileSize) end
+  if mapX ~= oldMapX then background.x = background.x + (dx * tileSize * zoomX) end
+  if mapY ~= oldMapY then background.y = background.y + (dy * tileSize * zoomY) end
   -- only update if we actually moved
   if math.floor(mapX) ~= math.floor(oldMapX) or math.floor(mapY) ~= math.floor(oldMapY) then
     updateTilesetBatch()
@@ -188,17 +213,16 @@ function updateControl()
 end
 
 function startMove(ch, duration, dx, dy, scale)
-  ch.hx = ch.x + (dx * tileSize)
-  ch.hy = ch.y + (dy * tileSize)
   moving = true
+  ch.hx = ch.x + (dx * tileSize * zoomX)
+  ch.hy = ch.y + (dy * tileSize * zoomY)
   flux.to(ch, duration, {x=ch.hx, y=ch.hy}):ease("linear"):oncomplete(endMove)
 end
 function endMove(ch)
-  moving = false
   ch.cx=ch.x
   ch.cy=ch.y
-
-  moveMap(math.floor(-background.x/tileSize), math.floor(-background.y/tileSize))
+  moveMap(math.floor(-background.x/(tileSize*zoomX)), math.floor(-background.y/(tileSize*zoomY)))
+  moving = false
 end
 
 -- Draw a frame
@@ -211,7 +235,7 @@ function love.draw()
     0, zoomX, zoomY)
 
   love.graphics.setFont(smallfont)
-  love.graphics.print("Brains!", zombie.x + 35, zombie.y - 35)
+  love.graphics.print("Brains! "..tileIndex(tileRawData, 178), zombie.x + 35, zombie.y - 35)
   love.graphics.print(info, player.x + 35, player.y - 35)
 
   Zanim:draw(zombieSheet, zombie.x, zombie.y, 0, 2.0) -- rotation, scale
@@ -230,5 +254,5 @@ function love.draw()
 
   -- FPS counter- always last.
   love.graphics.setColor(255, 128, 0, 200)
-  love.graphics.print("FPS: "..love.timer.getFPS(), 10, 20)
+  love.graphics.print(background.x..","..background.y.."FPS: "..love.timer.getFPS(), 10, 20)
 end

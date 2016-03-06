@@ -2,11 +2,12 @@
 local anim8 = require 'anim8'
 -- https://github.com/rxi/flux
 local flux = require "flux"
+local xml = require "xml"
 
-
+local xmlTest, xmlError = xml:ParseXmlFile("ztown.tmx")
 
 local b64 = require "b64"
-local testLevel = "eJytl8tOVEEQhlt8AmBBFDY4LgzKghFQTPAyeFkaQF2gIoqXaFgZRIhEo2JCIhuMbNRZIBgBb4t5BF7MvzJVoSiqzzk9sPjSc7qL/qtOd1UdqiGEquIQaFIcNnP0vAA2wRce34Ie0AfumnE8Mi9j1dAMWhStZo6ePxv9ZaU/weMYj/08jvAojEb0O8ExRcnMlTLiHwQXwXkwDO6wH7dZj9Yv8LrM/zVcZ5t74Bq4DC7x3FVQicR/HzwEj8Bj8AQ8UDwDU7z+Grxh1sD3xHEdbIFf4DdY5TVtl7WH/F5j/1OZz3lOsf3aAEtmj6V92EpOpcT/Lec5tvbKsZWcmgEvmZmccdac/4uwt25IXHm2klM1g1eHtpnFsPv+fwh760Y3x2VtKVd1Pg+AXkffq0Oypvekd7ri2LdE9ClXT7MuQfWp7Oh7dWjb0d/cp34s/h72TSjn6Ft/xWdPn+pZG7ii9v5n8PRrGedvY5K4vPOvqb3EzvYB0h9mP0fMGXnxk/45tqfafiaiv2zeM9Xlp+CPwdbzSbXmxe/V/8lI/PT+Kxz/XAPY/rcSdu6GHr2zsvG/Czu9oCgbYXdN+QF+RrC2FP9QqPdV0l8PjfWgRvvPqolF5m1dpHr3PPh1cNbsmdJ/YtgcLvFZe3Vo0fxt0f7jMa30Keco1+hbqcz6kod63urTu8vrWbFxQelTXtwCN0I9P0R/VPng6VP+xfpGHqJPd9je8/fsE/lzk32rOPrku9yT47zvCXAkQd8jllcbyuZj8PtvUT6F+j3XTIfsO+PdXdHvztE7CtpBBz979c3zyfqna0pK/F3gJDjFz1SH6Lt/KOG3/f6P9f8iHET9p/i9/l8EiWmu4O+2SPzS/6kH0/911H/Pmjk9T3P9Bxi//f7QmqJrv08GEmPPOn9PP6ap+Q944Ljq"
+local testLevel = xmlTest.ChildNodes[2].ChildNodes[1].Value -- todo: proper loader
 testBin = b64.decode(testLevel);
 tileRawData = love.math.decompress( testBin, "zlib" )
 function tileIndex(raw, tileOffset)
@@ -15,7 +16,7 @@ function tileIndex(raw, tileOffset)
   if idx == nil then return nil end
   idx = idx + (string.byte(raw, bz+1)*256)
   idx = idx + (string.byte(raw, bz+2)*65536)
-  idx = idx + (string.byte(raw, bz+3)*16777216)
+  --idx = idx + (string.byte(raw, bz+3)*16777216) -- skipping the highest byte, as it has flags we don't interpret
   return idx
 end
 
@@ -194,22 +195,19 @@ end
 function updateControl()
   local dx = 0
   local dy = 0
-  if input.up then dy = -1 end
-  if input.down then dy = 1 end
-  if input.left then dx = -1 end
-  if input.right then dx = 1 end
+      if input.up    then dy = -1
+  elseif input.down  then dy =  1
+  elseif input.left  then dx = -1
+  elseif input.right then dx =  1 end
 
+  if input.action then info = "!!!" else info = "?" end
   -- Moving character over static background
   --if (dx ~= 0 or dy ~= 0) then startMove(player, 0.4, dx, dy) end
 
   -- static character over moving background
-  if (dx ~= 0 or dy ~= 0) then
-    if moving == true then return end
-    startMove(zombie, 0.4, -dx, -dy)
+  if not moving and (dx ~= 0 or dy ~= 0) then
     startMove(background, 0.4, -dx, -dy)
   end
-
-  if input.action then info = "!!!" else info = "?" end
 end
 
 function startMove(ch, duration, dx, dy, scale)
@@ -227,32 +225,62 @@ end
 
 -- Draw a frame
 function love.draw()
+  local sceneX = background.x - zoomX*mapX*tileSize
+  local sceneY = background.y - zoomY*mapY*tileSize
   love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setFont(smallfont)
   -- tile batch backdrop
   love.graphics.draw(tilesetBatch,
      math.floor(background.x - zoomX*(mapX%1)*tileSize),
      math.floor(background.y - zoomY*(mapY%1)*tileSize),
     0, zoomX, zoomY)
 
-  love.graphics.setFont(smallfont)
-  love.graphics.print("Brains! "..tileIndex(tileRawData, 178), zombie.x + 35, zombie.y - 35)
+  love.graphics.print("Brains! ", sceneX + zombie.x + 35, sceneY + zombie.y - 35)
   love.graphics.print(info, player.x + 35, player.y - 35)
 
-  Zanim:draw(zombieSheet, zombie.x, zombie.y, 0, 2.0) -- rotation, scale
+  Zanim:draw(zombieSheet, sceneX + zombie.x, sceneY + zombie.y, 0, 2.0) -- rotation, scale
   Panim:draw(playerSheet, player.x, player.y, 0, 2.0)
-  --love.graphics.draw(zombSheet,zquad, 30 + (10 * math.cos(fh*4)), 20 + (10 * math.sin(fh*4)))
 
-  --near last, the control outlines
-  love.graphics.setColor(0, 0, 0, 200)
-  -- directions
-  love.graphics.circle("line", buttons.up[1], buttons.up[2], 50, 4)
-  love.graphics.circle("line", buttons.down[1], buttons.down[2], 50, 4)
-  love.graphics.circle("line", buttons.left[1], buttons.left[2], 50, 4)
-  love.graphics.circle("line", buttons.right[1], buttons.right[2], 50, 4)
-  -- action
-  love.graphics.circle("line", buttons.action[1], buttons.action[2], 50, 6)
+  drawControlHints()  --near last, the control outlines
+  drawFPS()  -- FPS counter- always last.
+end
 
-  -- FPS counter- always last.
-  love.graphics.setColor(255, 128, 0, 200)
-  love.graphics.print(background.x..","..background.y.."FPS: "..love.timer.getFPS(), 10, 20)
+function drawFPS()
+  love.graphics.setColor(255, 128, 0, 255)
+  love.graphics.print("FPS: ", 10, 20)
+  love.graphics.print(love.timer.getFPS()..xmlError, 44, 20)
+
+toff = 100
+  --for k,v in ipairs(xmlTest) do
+  --[[for k,v in pairs(xmlTest) do
+    love.graphics.print(k..":"..v.Name, 10, toff)
+    toff = toff + 14
+  end]]
+
+--[[
+  for i,xmlNode in pairs(xmlTest.ChildNodes) do
+  		for i,subXmlNode in pairs(xmlNode.ChildNodes) do
+  				if(subXmlNode.Value) then
+
+    					love.graphics.print(subXmlNode.Attributes.encoding.." : "..subXmlNode.Attributes.compression, 0, toff)
+  					love.graphics.print(subXmlNode.Value, 0, toff)
+            toff = toff + 28
+  				end
+  	end
+  end]]
+
+
+end
+
+function drawControlHints()
+  for itr = 0, 2 do
+    love.graphics.setColor(itr*70, itr*70, itr*70, 200)
+    -- directions
+    love.graphics.circle("line", buttons.up[1] + itr, buttons.up[2], 50, 4)
+    love.graphics.circle("line", buttons.down[1] + itr, buttons.down[2], 50, 4)
+    love.graphics.circle("line", buttons.left[1] + itr, buttons.left[2], 50, 4)
+    love.graphics.circle("line", buttons.right[1] + itr, buttons.right[2], 50, 4)
+    -- action
+    love.graphics.circle("line", buttons.action[1] + itr, buttons.action[2], 50, 6)
+  end
 end

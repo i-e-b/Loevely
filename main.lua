@@ -7,11 +7,11 @@ local xml = require "xml"
 local xmlTest, xmlError = xml:ParseXmlFile("ztown.tmx")
 
 local b64 = require "b64"
-local testLevel = xmlTest.ChildNodes[2].ChildNodes[1].Value -- todo: proper loader
+local testLevel = xmlTest.ChildNodes[3].ChildNodes[1].Value -- todo: proper loader
 testBin = b64.decode(testLevel);
 tileRawData = love.math.decompress( testBin, "zlib" )
 function tileIndex(raw, tileOffset)
-  local bz = (tileOffset * 4) - 3 -- 1 based indexing is weird
+  local bz = (tileOffset * 4) + 1 -- 1 based indexing is weird
   local idx = string.byte(raw, bz)
   if idx == nil then return nil end
   idx = idx + (string.byte(raw, bz+1)*256)
@@ -48,24 +48,26 @@ local tilesetSprite
 
 
 function setupMap()
-  mapWidth = 32
-  mapHeight = 32
+  mapWidth = xmlTest.Attributes.width
+  mapHeight = xmlTest.Attributes.height
 
   map = {}
-  for x=1,mapWidth do
-    map[x] = {}
-    for y=1,mapHeight do
-      map[x][y] = tileIndex(tileRawData, (y*mapWidth)+x)
+  for x=0,mapWidth do
+    map[x+1] = {}
+    for y=0,mapHeight do
+      map[x+1][y+1] = tileIndex(tileRawData, (y*mapWidth)+x)
     end
   end
+  mapWidth = mapWidth + 1   -- for 1 based indexing craziness
+  mapHeight = mapHeight + 1
 end
 
 function setupMapView()
-  tileSize = 16
+  tileSize = xmlTest.Attributes.tilewidth
   mapX = 1
   mapY = 1
-  zoomX = 2
-  zoomY = 2
+  zoomX = 3
+  zoomY = 3
 
   tilesDisplayWidth = math.ceil(screenWidth / (tileSize*zoomX)) + 3
   tilesDisplayHeight = math.ceil(screenHeight / (tileSize*zoomY)) + 2
@@ -238,8 +240,8 @@ function love.draw()
   love.graphics.print("Brains! ", sceneX + zombie.x + 35, sceneY + zombie.y - 35)
   love.graphics.print(info, player.x + 35, player.y - 35)
 
-  Zanim:draw(zombieSheet, sceneX + zombie.x, sceneY + zombie.y, 0, 2.0) -- rotation, scale
-  Panim:draw(playerSheet, player.x, player.y, 0, 2.0)
+  Zanim:draw(zombieSheet, sceneX + zombie.x, sceneY + zombie.y, 0, zoomX) -- rotation, scale
+  Panim:draw(playerSheet, player.x, player.y, 0, zoomX)
 
   drawControlHints()  --near last, the control outlines
   drawFPS()  -- FPS counter- always last.
@@ -248,7 +250,7 @@ end
 function drawFPS()
   love.graphics.setColor(255, 128, 0, 255)
   love.graphics.print("FPS: ", 10, 20)
-  love.graphics.print(love.timer.getFPS()..xmlError, 44, 20)
+  love.graphics.print(love.timer.getFPS(), 44, 20)
 
 toff = 100
   --for k,v in ipairs(xmlTest) do

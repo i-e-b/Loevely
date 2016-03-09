@@ -43,17 +43,17 @@ end
 function drawBgRow(row, level, offsets)
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.draw(level.bgBatch[row],
-      math.floor(offsets.x - level.zoomX * (level.mapX % 1) * level.tiles.size),
-      math.floor(offsets.y - level.zoomY * (level.mapY % 1) * level.tiles.size),
-      0, level.zoomX, level.zoomY)
+      math.floor(offsets.x - level.zoom * (level.mapX % 1) * level.tiles.size),
+      math.floor(offsets.y - level.zoom * (level.mapY % 1) * level.tiles.size),
+      0, level.zoom, level.zoom)
 end
 
 function drawFgRow(row, level, offsets)
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.draw(level.fgBatch[row],
-      math.floor(offsets.x - level.zoomX * (level.mapX % 1) * level.tiles.size),
-      math.floor(offsets.y - level.zoomY * (level.mapY % 1) * level.tiles.size),
-      0, level.zoomX, level.zoomY)
+      math.floor(offsets.x - level.zoom * (level.mapX % 1) * level.tiles.size),
+      math.floor(offsets.y - level.zoom * (level.mapY % 1) * level.tiles.size),
+      0, level.zoom, level.zoom)
 end
 
 -- central function for moving the map by whole tiles
@@ -63,7 +63,7 @@ function moveMap(level, targetX, targetY, offsets)
   local oldMapX = level.mapX
   local oldMapY = level.mapY
 
-  local tzs = level.tiles.size*level.zoomX
+  local tzs = level.tiles.size*level.zoom
 
   -- translate graphics position to tile position
   local newX = math.floor(-targetX / tzs)
@@ -136,12 +136,11 @@ end
 function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWidth, screenHeight)
   level.mapX = 1
   level.mapY = 1
-  level.zoomX = 4
-  level.zoomY = 4
+  level.zoom = 4
 
   level.tiles.size = 0+tileSize
-  level.tiles.DisplayWidth = math.ceil(screenWidth / (tileSize*level.zoomX)) + 3
-  level.tiles.DisplayHeight = math.ceil(screenHeight / (tileSize*level.zoomY)) + 2
+  level.tiles.DisplayWidth = math.ceil(screenWidth / (tileSize*level.zoom)) + 3
+  level.tiles.DisplayHeight = math.ceil(screenHeight / (tileSize*level.zoom)) + 2
 
   level.rowsToDraw = level.tiles.DisplayHeight
 

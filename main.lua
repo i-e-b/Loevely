@@ -7,8 +7,9 @@ local level = require "level"
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 
 local smallfont
-local zombie = {x=16, y=20, thinking="Brains!"} -- todo: load positions from level
-local player = {x=16, y=10, thinking=""} -- tile position, but can be fractional
+ -- todo: load positions from level
+local zombie = {speed=2, x=16, y=20, thinking="Brains!", anims={}}
+local player = {speed=4, x=16, y=10, thinking="", anims={}}
 local mapOffset = {x = 1, y = 1} -- pixel offset for scrolling
 local moving = false -- is player moving? (if so, direction won't change until finished)
 -- Position of touch buttons:
@@ -33,11 +34,20 @@ function love.load()
   local sw = creepSheet:getWidth()
   local sh = creepSheet:getHeight()
 
-  local zg = anim8.newGrid(17, 18, sw, sh, 8*17, 0)
-  zombie.anim = anim8.newAnimation(zg('1-4',1), 0.2)
+  local grid = anim8.newGrid(17, 18, sw, sh, 0, 0)
+  zombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)
+  zombie.anims['right'] = anim8.newAnimation(grid('9-12',2), 0.2)
+  zombie.anims['left'] = anim8.newAnimation(grid('9-12',3), 0.2)
+  zombie.anims['up'] = anim8.newAnimation(grid('9-12',4), 0.2)
+  zombie.anims['stand'] = anim8.newAnimation(grid(7,'1-4'), 0.4)
+  zombie.anim = zombie.anims['stand']
 
-  local pg = anim8.newGrid(17, 18, sw, sh, 0, 0)
-  player.anim = anim8.newAnimation(pg('1-4',1), 0.1)
+  player.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
+  player.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
+  player.anims['left'] = anim8.newAnimation(grid('1-4',3), 0.1)
+  player.anims['up'] = anim8.newAnimation(grid('1-4',4), 0.1)
+  player.anims['stand'] = anim8.newAnimation(grid(6,'1-3'), 0.8)
+  player.anim = player.anims['stand']
 end
 
 function love.keypressed(k)
@@ -91,7 +101,7 @@ function love.update(dt)
   updateControl()
 
   -- centre map around player
-  local tilePixelSize = currentLevel.zoomX * currentLevel.tiles.size
+  local tilePixelSize = currentLevel.zoom * currentLevel.tiles.size
   local targetX = playerCentreX - (player.x * tilePixelSize)
   local targetY = playerCentreY - ((player.y+0.7) * tilePixelSize)
 
@@ -102,26 +112,40 @@ end
 function updateControl()
   local dx = 0
   local dy = 0
-      if input.up    then dy = -1
-  elseif input.down  then dy =  1
-  elseif input.left  then dx = -1
-  elseif input.right then dx =  1 end
+      if input.up    then dy = -1; dx = 0
+  elseif input.down  then dy =  1; dx = 0
+  elseif input.left  then dx = -1; dy = 0
+  elseif input.right then dx =  1; dy = 0 end
 
   if input.action then player.thinking = "!!!" else player.thinking = "" end
 
   -- static character over moving background
   if not moving and (dx ~= 0 or dy ~= 0) then
     if (level.isPassable(currentLevel, player, dx, dy)) then
-      startMove(player, 0.1, dx, dy)
+      startMove(player, 1/player.speed, dx, dy)
+    else
+      dx =  0; dy = 0
     end
   end
 end
 
 function startMove(ch, duration, dx, dy, scale)
+  -- lock out player movement
   moving = true
+
+  -- set directional animation
+  if (dx == 1) then ch.anim = ch.anims['right']
+  elseif (dx == -1) then ch.anim = ch.anims['left']
+  elseif (dy == 1) then ch.anim = ch.anims['down']
+  elseif (dy == -1) then ch.anim = ch.anims['up'] end
+
+  -- move to next tile
   flux.to(ch, duration, {x=ch.x+dx, y=ch.y+dy }):ease("linear"):oncomplete(endMove)
 end
 function endMove(ch)
+  -- return to idle animation
+  player.anim = player.anims['stand']
+  -- unlock movement
   moving = false
 end
 
@@ -130,11 +154,10 @@ function love.draw()
 
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.setFont(smallfont)
-  local zts = currentLevel.zoomX * currentLevel.tiles.size
-  local zoomX = currentLevel.zoomX
-  local zoomY = currentLevel.zoomY
-  local sceneX = mapOffset.x - zoomX * currentLevel.mapX * currentLevel.tiles.size
-  local sceneY = mapOffset.y - zoomY * currentLevel.mapY * currentLevel.tiles.size
+  local zts = currentLevel.zoom * currentLevel.tiles.size
+  local zoom = currentLevel.zoom
+  local sceneX = mapOffset.x - zts * currentLevel.mapX
+  local sceneY = mapOffset.y - zts * currentLevel.mapY
 
   -- assign all the active chars to a draw row, then pick them back out
   -- as we draw
@@ -150,11 +173,9 @@ function love.draw()
     if (charRows[row]) then
       for i,char in ipairs(charRows[row]) do
         love.graphics.print(char.thinking, math.floor(sceneX + (char.x*zts)), math.floor(sceneY + (char.y+0.4)*zts))
-        char.anim:draw(char.sheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoomX)
+        char.anim:draw(char.sheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
       end
     end
-      --zombie.anim:draw(zombie.sheet, sceneX + (zombie.x*zts), sceneY + (zombie.y*zts), 0, zoomX) -- rotation, scale
-      --player.anim:draw(player.sheet, sceneX + (player.x*zts), sceneY + (player.y*zts), 0, zoomX)
     level.drawFgRow(row, currentLevel, mapOffset)
   end
 

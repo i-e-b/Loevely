@@ -4,8 +4,6 @@ local anim8 = require 'anim8'
 local flux = require "flux"
 local level = require "level"
 
-
-local zombieSheet, playerSheet, Zanim, Panim
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 local info = "?"
 
@@ -28,17 +26,17 @@ function love.load()
   playerCentreY = (screenHeight / 2) - (currentLevel.tiles.size / 2)
 
   smallfont = love.graphics.newImageFont("smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]\"")
-  zombieSheet = love.graphics.newImage("zombie.png")
-  zombieSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
+  zombie.sheet = love.graphics.newImage("zombie.png")
+  zombie.sheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
 
-  playerSheet = love.graphics.newImage("player.png")
-  playerSheet:setFilter("linear", "nearest")
+  player.sheet = love.graphics.newImage("player.png")
+  player.sheet:setFilter("linear", "nearest")
 
-  local zg = anim8.newGrid(41, 41, zombieSheet:getWidth(), zombieSheet:getHeight(), 7, 22)
-  Zanim = anim8.newAnimation(zg('1-2',1), 0.2)
+  local zg = anim8.newGrid(41, 41, zombie.sheet:getWidth(), zombie.sheet:getHeight(), 7, 22)
+  zombie.anim = anim8.newAnimation(zg('1-2',1), 0.2)
 
-  local pg = anim8.newGrid(26, 37, playerSheet:getWidth(), playerSheet:getHeight(), 430, 253)
-  Panim = anim8.newAnimation(pg('1-4',1), 0.1)
+  local pg = anim8.newGrid(26, 37, player.sheet:getWidth(), player.sheet:getHeight(), 430, 253)
+  player.anim = anim8.newAnimation(pg('1-4',1), 0.1)
 end
 
 function love.keypressed(k)
@@ -51,8 +49,8 @@ end
 
 function updateAnimations(dt)
   flux.update(dt)
-  Zanim:update(dt)
-  Panim:update(dt)
+  zombie.anim:update(dt)
+  player.anim:update(dt)
 end
 
 local input = {up=false, down=false, left=false, right=false, action=false}
@@ -93,11 +91,10 @@ function love.update(dt)
 
   -- centre map around player
   local tilePixelSize = currentLevel.zoomX * currentLevel.tiles.size
-  local px = player.x * tilePixelSize
-  local py = player.y * tilePixelSize
-  local targetX = playerCentreX - px
-  local targetY = playerCentreY - py
+  local targetX = playerCentreX - (player.x * tilePixelSize)
+  local targetY = playerCentreY - (player.y * tilePixelSize)
 
+  -- adjust display grid and mapOffset
   level.moveMap(currentLevel, targetX, targetY, mapOffset)
 end
 
@@ -110,12 +107,12 @@ function updateControl()
   elseif input.right then dx =  1 end
 
   if input.action then info = "!!!" else info = "?" end
-  -- Moving character over static background
-  --if (dx ~= 0 or dy ~= 0) then startMove(player, 0.4, dx, dy) end
 
   -- static character over moving background
   if not moving and (dx ~= 0 or dy ~= 0) then
-    startMove(player, 0.4, dx, dy)
+    if (level.isPassable(currentLevel, player.x+dx, player.y+dy)) then
+      startMove(player, 0.4, dx, dy)
+    end
   end
 end
 
@@ -137,21 +134,34 @@ function love.draw()
   local zoomY = currentLevel.zoomY
   local sceneX = mapOffset.x - zoomX * currentLevel.mapX * currentLevel.tiles.size
   local sceneY = mapOffset.y - zoomY * currentLevel.mapY * currentLevel.tiles.size
-  level.drawBg(currentLevel, mapOffset)
 
-  love.graphics.print("Brains! ", sceneX + zombie.x + 35, sceneY + zombie.y - 35)
-
-  Zanim:draw(zombieSheet, sceneX + zombie.x, sceneY + zombie.y, 0, zoomX) -- rotation, scale
-
-
-  love.graphics.print(info, playerCentreX + 35, playerCentreY - 35)
-  Panim:draw(playerSheet, playerCentreX, playerCentreY, 0, zoomX)
+  -- assign all the active chars to a draw row, then pick them back out
+  -- as we draw
+  local charRows = {}
+  charRows[level.posToRow(zombie, currentLevel)] = {zombie}
+  charRows[level.posToRow(player, currentLevel)] = {player}
 
   -- todo: scan through rows, draw chars on or above the row
   --       then the fg row.
   for row = 1, currentLevel.rowsToDraw do
+    level.drawBgRow(row, currentLevel, mapOffset)
+    -- pick chars in slots
+    if (charRows[row]) then
+      for i,char in ipairs(charRows[row]) do
+        char.anim:draw(char.sheet, sceneX + (char.x*zts), sceneY + (char.y*zts), 0, zoomX)
+      end
+    end
+      --zombie.anim:draw(zombie.sheet, sceneX + (zombie.x*zts), sceneY + (zombie.y*zts), 0, zoomX) -- rotation, scale
+      --player.anim:draw(player.sheet, sceneX + (player.x*zts), sceneY + (player.y*zts), 0, zoomX)
     level.drawFgRow(row, currentLevel, mapOffset)
   end
+
+  -- be nice to the gc, assuming it does fast gen 0
+  charRows = nil
+
+  -- speech over fg stuff
+  love.graphics.print("Brains! ", sceneX + zombie.x + 35, sceneY + zombie.y - 35)
+  love.graphics.print(info, playerCentreX + 35, playerCentreY - 35)
   drawControlHints()  --near last, the control outlines
   drawFPS()  -- FPS counter- always last.
 end

@@ -6,7 +6,7 @@ local dumper = require "dumper"
 function load(filename, screenWidth, screenHeight)
   local xmlTest, xmlError = xml:ParseXmlFile(filename)
   if (xmlError ~= "ok") then error(xmlError) end
-  local lvl = {bg={}, fg={}, tiles={}}
+  local lvl = {bg={}, fg={}, tiles={}, passable={}}
   for i,xmlNode in pairs(xmlTest.ChildNodes) do
     if (xmlNode.Name == "tileset") then
       -- read in image name, load the image
@@ -40,22 +40,20 @@ function load(filename, screenWidth, screenHeight)
   return lvl
 end
 
-function drawBg(level, offsets)
+function drawBgRow(row, level, offsets)
   love.graphics.setColor(255, 255, 255, 255)
-  for i, batch in ipairs(level.bgBatch) do
-    love.graphics.draw(batch,
-       math.floor(offsets.x - level.zoomX * (level.mapX % 1) * level.tiles.size),
-       math.floor(offsets.y - level.zoomY * (level.mapY % 1) * level.tiles.size),
+  love.graphics.draw(level.bgBatch[row],
+      math.floor(offsets.x - level.zoomX * (level.mapX % 1) * level.tiles.size),
+      math.floor(offsets.y - level.zoomY * (level.mapY % 1) * level.tiles.size),
       0, level.zoomX, level.zoomY)
-  end
 end
 
 function drawFgRow(row, level, offsets)
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.draw(level.fgBatch[row],
-     math.floor(offsets.x - level.zoomX * (level.mapX % 1) * level.tiles.size),
-     math.floor(offsets.y - level.zoomY * (level.mapY % 1) * level.tiles.size),
-    0, level.zoomX, level.zoomY)
+      math.floor(offsets.x - level.zoomX * (level.mapX % 1) * level.tiles.size),
+      math.floor(offsets.y - level.zoomY * (level.mapY % 1) * level.tiles.size),
+      0, level.zoomX, level.zoomY)
 end
 
 -- central function for moving the map by whole tiles
@@ -72,8 +70,8 @@ function moveMap(level, targetX, targetY, offsets)
   local newY = math.floor(-targetY / tzs)
 
   -- pin translated position to legal values
-  level.mapX = math.max(math.min(newX, level.width - level.tiles.DisplayWidth), 1)
-  level.mapY = math.max(math.min(newY, level.height - level.tiles.DisplayHeight), 1)
+  level.mapX = math.max(math.min(newX, 1+level.width - level.tiles.DisplayWidth), 1)
+  level.mapY = math.max(math.min(newY, 1+level.height - level.tiles.DisplayHeight), 1)
 
   -- pixel offsets (fractional part of tile offset)
   offsets.x = targetX + (level.mapX * tzs)
@@ -84,6 +82,17 @@ function moveMap(level, targetX, targetY, offsets)
   if math.floor(level.mapX) ~= math.floor(oldMapX) or math.floor(level.mapY) ~= math.floor(oldMapY) then
     updateTilesetBatch(level)
   end
+end
+
+-- given map tile coords, return the draw row it's on (can be off-screen)
+function posToRow(pos, level)
+  return (math.ceil(pos.y) - level.mapY) + 2
+end
+
+function isPassable(level, x, y)
+  if (x<1 or y<0) then return false end
+  if (x > level.width) or (y > level.height) then return false end
+  return level.passable[level.bg[x][y+1]]
 end
 
 function tileIndex(raw, tileOffset)
@@ -117,7 +126,7 @@ function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWi
   level.zoomX = 4
   level.zoomY = 4
 
-  level.tiles.size = tileSize
+  level.tiles.size = 0+tileSize
   level.tiles.DisplayWidth = math.ceil(screenWidth / (tileSize*level.zoomX)) + 3
   level.tiles.DisplayHeight = math.ceil(screenHeight / (tileSize*level.zoomY)) + 2
 
@@ -132,18 +141,24 @@ function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWi
   local tilesAcross = math.floor(imgWidth / tileSize) - 1
   local tilesDown = math.floor(imgHeight / tileSize) - 1
 
-  level.width = tilesWide
-  level.height = tilesTall
+  level.width = 0+tilesWide
+  level.height = 0+tilesTall
 
   level.tiles.quads = {}
   for x=0,tilesAcross do
     for y=0,tilesDown do
+      level.passable[(y*tileSize)+x+1] = y > 6 -- hard coded passability
       level.tiles.quads[(y*tileSize)+x+1] =
         love.graphics.newQuad(
           x * tileSize, y * tileSize, tileSize, tileSize, imgWidth, imgHeight
         )
     end
   end
+
+  -- hard coded passability. Todo: find a *nice* way to do this from the map file
+  for i,n in ipairs({18,20,21,22,36,37,38,39,40,41,64,101}) do level.passable[n] = true end
+  for i,n in ipairs({126,127,128,173,174,175,176,190,191,222,223}) do level.passable[n] = false end
+
   level.fgBatch = {}
   level.bgBatch = {}
   for j=1,level.tiles.DisplayHeight do
@@ -158,7 +173,6 @@ function updateTilesetBatch(level)
 end
 
 function internalUpdateTilesetBatch(level, batch, map)
-  --batch:clear()
   local mw = math.min(level.width,  level.tiles.DisplayWidth)
   local mh = math.min(level.height, level.tiles.DisplayHeight)
   local q,mx,my
@@ -183,8 +197,10 @@ end
 
 local export = {
   load = load,
-  drawBg = drawBg,
+  drawBgRow = drawBgRow,
   drawFgRow = drawFgRow,
-  moveMap = moveMap
+  moveMap = moveMap,
+  isPassable = isPassable,
+  posToRow = posToRow
 }
 return export

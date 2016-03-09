@@ -5,11 +5,10 @@ local flux = require "flux"
 local level = require "level"
 
 local screenWidth, screenHeight, playerCentreX, playerCentreY
-local info = "?"
 
 local smallfont
-local zombie = {x=16, y=20} -- todo: load positions from level
-local player = {x=16, y=10} -- tile position, but can be fractional
+local zombie = {x=16, y=20, thinking="Brains!"} -- todo: load positions from level
+local player = {x=16, y=10, thinking=""} -- tile position, but can be fractional
 local mapOffset = {x = 1, y = 1} -- pixel offset for scrolling
 local moving = false -- is player moving? (if so, direction won't change until finished)
 -- Position of touch buttons:
@@ -24,18 +23,20 @@ function love.load()
 
   playerCentreX = (screenWidth / 2) - (currentLevel.tiles.size / 2)
   playerCentreY = (screenHeight / 2) - (currentLevel.tiles.size / 2)
-
   smallfont = love.graphics.newImageFont("smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]\"")
-  zombie.sheet = love.graphics.newImage("zombie.png")
-  zombie.sheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
 
-  player.sheet = love.graphics.newImage("player.png")
-  player.sheet:setFilter("linear", "nearest")
+  local creepSheet = love.graphics.newImage("creeps.png")
+  creepSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
 
-  local zg = anim8.newGrid(41, 41, zombie.sheet:getWidth(), zombie.sheet:getHeight(), 7, 22)
-  zombie.anim = anim8.newAnimation(zg('1-2',1), 0.2)
+  zombie.sheet = creepSheet
+  player.sheet = creepSheet
+  local sw = creepSheet:getWidth()
+  local sh = creepSheet:getHeight()
 
-  local pg = anim8.newGrid(26, 37, player.sheet:getWidth(), player.sheet:getHeight(), 430, 253)
+  local zg = anim8.newGrid(17, 18, sw, sh, 8*17, 0)
+  zombie.anim = anim8.newAnimation(zg('1-4',1), 0.2)
+
+  local pg = anim8.newGrid(17, 18, sw, sh, 0, 0)
   player.anim = anim8.newAnimation(pg('1-4',1), 0.1)
 end
 
@@ -92,7 +93,7 @@ function love.update(dt)
   -- centre map around player
   local tilePixelSize = currentLevel.zoomX * currentLevel.tiles.size
   local targetX = playerCentreX - (player.x * tilePixelSize)
-  local targetY = playerCentreY - (player.y * tilePixelSize)
+  local targetY = playerCentreY - ((player.y+0.7) * tilePixelSize)
 
   -- adjust display grid and mapOffset
   level.moveMap(currentLevel, targetX, targetY, mapOffset)
@@ -106,12 +107,12 @@ function updateControl()
   elseif input.left  then dx = -1
   elseif input.right then dx =  1 end
 
-  if input.action then info = "!!!" else info = "?" end
+  if input.action then player.thinking = "!!!" else player.thinking = "" end
 
   -- static character over moving background
   if not moving and (dx ~= 0 or dy ~= 0) then
-    if (level.isPassable(currentLevel, player.x+dx, player.y+dy)) then
-      startMove(player, 0.4, dx, dy)
+    if (level.isPassable(currentLevel, player, dx, dy)) then
+      startMove(player, 0.1, dx, dy)
     end
   end
 end
@@ -138,8 +139,8 @@ function love.draw()
   -- assign all the active chars to a draw row, then pick them back out
   -- as we draw
   local charRows = {}
-  charRows[level.posToRow(zombie, currentLevel)] = {zombie}
-  charRows[level.posToRow(player, currentLevel)] = {player}
+  appendMap(charRows, zombie, level.posToRow(zombie, currentLevel))
+  appendMap(charRows, player, level.posToRow(player, currentLevel))
 
   -- todo: scan through rows, draw chars on or above the row
   --       then the fg row.
@@ -148,7 +149,8 @@ function love.draw()
     -- pick chars in slots
     if (charRows[row]) then
       for i,char in ipairs(charRows[row]) do
-        char.anim:draw(char.sheet, sceneX + (char.x*zts), sceneY + (char.y*zts), 0, zoomX)
+        love.graphics.print(char.thinking, math.floor(sceneX + (char.x*zts)), math.floor(sceneY + (char.y+0.4)*zts))
+        char.anim:draw(char.sheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoomX)
       end
     end
       --zombie.anim:draw(zombie.sheet, sceneX + (zombie.x*zts), sceneY + (zombie.y*zts), 0, zoomX) -- rotation, scale
@@ -159,11 +161,16 @@ function love.draw()
   -- be nice to the gc, assuming it does fast gen 0
   charRows = nil
 
-  -- speech over fg stuff
-  love.graphics.print("Brains! ", sceneX + zombie.x + 35, sceneY + zombie.y - 35)
-  love.graphics.print(info, playerCentreX + 35, playerCentreY - 35)
   drawControlHints()  --near last, the control outlines
   drawFPS()  -- FPS counter- always last.
+end
+
+function appendMap(arry, obj, index)
+  if not arry[index] then
+    arry[index] = {obj}
+    return
+  end
+  table.insert(arry[index], obj)
 end
 
 function drawFPS()

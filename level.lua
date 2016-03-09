@@ -89,10 +89,23 @@ function posToRow(pos, level)
   return (math.ceil(pos.y) - level.mapY) + 2
 end
 
-function isPassable(level, x, y)
-  if (x<1 or y<0) then return false end
+function isPassable(level, pos, dx, dy)
+  local x = pos.x + dx
+  local y = pos.y + dy + 1
+
+  -- check bounds
+  if (x<1 or y<1) then return false end
   if (x > level.width) or (y > level.height) then return false end
-  return level.passable[level.bg[x][y+1]]
+
+  -- for bg, check the target block
+  if not level.passable[level.bg[x][y]] then return false end
+
+  -- for fg, if it blocks, you can go into it with  dy=1 or 0
+  --         but you can only leave it with dy=-1 or 0
+  if (dy == 0) then return true end
+  if (dy == -1) and (level.passable[level.fg[pos.x][pos.y]]) then return true end
+  if (dy == 1) and (level.passable[level.fg[pos.x][pos.y+1]]) then return true end
+  return false
 end
 
 function tileIndex(raw, tileOffset)
@@ -145,9 +158,11 @@ function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWi
   level.height = 0+tilesTall
 
   level.tiles.quads = {}
-  for x=0,tilesAcross do
-    for y=0,tilesDown do
-      level.passable[(y*tileSize)+x+1] = y > 6 -- hard coded passability
+
+  level.passable[0] = true -- unassigned tiles
+  for y=0,tilesDown do
+    for x=0,tilesAcross do
+      level.passable[(y*tileSize)+x+1] = y > 5 -- hard coded passability
       level.tiles.quads[(y*tileSize)+x+1] =
         love.graphics.newQuad(
           x * tileSize, y * tileSize, tileSize, tileSize, imgWidth, imgHeight
@@ -157,7 +172,7 @@ function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWi
 
   -- hard coded passability. Todo: find a *nice* way to do this from the map file
   for i,n in ipairs({18,20,21,22,36,37,38,39,40,41,64,101}) do level.passable[n] = true end
-  for i,n in ipairs({126,127,128,173,174,175,176,190,191,222,223}) do level.passable[n] = false end
+  for i,n in ipairs({110,111,112,126,127,128,158,159,190,191,222,223}) do level.passable[n] = false end
 
   level.fgBatch = {}
   level.bgBatch = {}

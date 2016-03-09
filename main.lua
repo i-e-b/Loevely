@@ -1,27 +1,32 @@
--- https://github.com/kikito/anim8
+-- character animations
 local anim8 = require 'anim8'
--- https://github.com/rxi/flux
+-- movement tweening. Modified from standard
 local flux = require "flux"
 local level = require "level"
 
 
 local zombieSheet, playerSheet, Zanim, Panim
-local screenWidth, screenHeight
+local screenWidth, screenHeight, playerCentreX, playerCentreY
 local info = "?"
 
 local smallfont
-local zombie = {x=0, y=100, hx=100, hy=100, cx=3, cy=3} -- position, heading, cell
-local player = {x=315, y=122, hx=300, hy=100, cx=9, cy=3} -- position, heading, cell
-local background = {x = 1, y = 1}
-local moving = false -- is player moving?
+local zombie = {x=16, y=20} -- todo: load positions from level
+local player = {x=16, y=10} -- tile position, but can be fractional
+local mapOffset = {x = 1, y = 1} -- pixel offset for scrolling
+local moving = false -- is player moving? (if so, direction won't change until finished)
+-- Position of touch buttons:
 local buttons = {up={155, 290}, down={155, 430}, left={85, 360}, right={225, 360}, action={900,650}}
+-- currently loaded level data
 local currentLevel
 
 -- Load non dynamic values
 function love.load()
   screenWidth, screenHeight = love.graphics.getDimensions( )
+  currentLevel = level.load("ztown.tmx", screenWidth, screenHeight);
 
-  currentLevel = level.load("hospital.tmx", screenWidth, screenHeight);
+  playerCentreX = (screenWidth / 2) - (currentLevel.tiles.size / 2)
+  playerCentreY = (screenHeight / 2) - (currentLevel.tiles.size / 2)
+
   smallfont = love.graphics.newImageFont("smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]\"")
   zombieSheet = love.graphics.newImage("zombie.png")
   zombieSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
@@ -39,8 +44,8 @@ end
 function love.keypressed(k)
 	if k == 'escape' then
 		love.event.push('quit') -- Quit the game.
-	elseif k == 'backspace' then
-    debug.debug()
+	--elseif k == 'backspace' then
+  --  debug.debug() -- need to be attached to a console, or this freezes everything.
   end
 end
 
@@ -85,6 +90,15 @@ function love.update(dt)
   readInputs()
   updateAnimations(dt)
   updateControl()
+
+  -- centre map around player
+  local tilePixelSize = currentLevel.zoomX * currentLevel.tiles.size
+  local px = player.x * tilePixelSize
+  local py = player.y * tilePixelSize
+  local targetX = playerCentreX - px
+  local targetY = playerCentreY - py
+
+  level.moveMap(currentLevel, targetX, targetY, mapOffset)
 end
 
 function updateControl()
@@ -101,43 +115,43 @@ function updateControl()
 
   -- static character over moving background
   if not moving and (dx ~= 0 or dy ~= 0) then
-    startMove(background, 0.4, -dx, -dy)
+    startMove(player, 0.4, dx, dy)
   end
 end
 
 function startMove(ch, duration, dx, dy, scale)
   moving = true
-  ch.hx = ch.x + (dx * currentLevel.tiles.size * currentLevel.zoomX)
-  ch.hy = ch.y + (dy * currentLevel.tiles.size * currentLevel.zoomY)
-  flux.to(ch, duration, {x=ch.hx, y=ch.hy}):ease("linear"):oncomplete(endMove)
+  flux.to(ch, duration, {x=ch.x+dx, y=ch.y+dy }):ease("linear"):oncomplete(endMove)
 end
 function endMove(ch)
-  ch.cx=ch.x
-  ch.cy=ch.y
-  level.moveMap(currentLevel,
-      math.floor(-background.x/(currentLevel.tiles.size*currentLevel.zoomX)),
-      math.floor(-background.y/(currentLevel.tiles.size*currentLevel.zoomY)),
-      background)
   moving = false
 end
 
 -- Draw a frame
 function love.draw()
+
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.setFont(smallfont)
+  local zts = currentLevel.zoomX * currentLevel.tiles.size
   local zoomX = currentLevel.zoomX
   local zoomY = currentLevel.zoomY
-  local sceneX = background.x - zoomX * currentLevel.mapX * currentLevel.tiles.size
-  local sceneY = background.y - zoomY * currentLevel.mapY * currentLevel.tiles.size
-  level.drawBg(currentLevel, background)
+  local sceneX = mapOffset.x - zoomX * currentLevel.mapX * currentLevel.tiles.size
+  local sceneY = mapOffset.y - zoomY * currentLevel.mapY * currentLevel.tiles.size
+  level.drawBg(currentLevel, mapOffset)
 
   love.graphics.print("Brains! ", sceneX + zombie.x + 35, sceneY + zombie.y - 35)
-  love.graphics.print(info, player.x + 35, player.y - 35)
 
   Zanim:draw(zombieSheet, sceneX + zombie.x, sceneY + zombie.y, 0, zoomX) -- rotation, scale
-  Panim:draw(playerSheet, player.x, player.y, 0, zoomX)
 
-  level.drawFg(currentLevel, background)
+
+  love.graphics.print(info, playerCentreX + 35, playerCentreY - 35)
+  Panim:draw(playerSheet, playerCentreX, playerCentreY, 0, zoomX)
+
+  -- todo: scan through rows, draw chars on or above the row
+  --       then the fg row.
+  for row = 1, currentLevel.rowsToDraw do
+    level.drawFgRow(row, currentLevel, mapOffset)
+  end
   drawControlHints()  --near last, the control outlines
   drawFPS()  -- FPS counter- always last.
 end

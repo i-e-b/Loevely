@@ -42,29 +42,45 @@ end
 
 function drawBg(level, offsets)
   love.graphics.setColor(255, 255, 255, 255)
-  love.graphics.draw(level.bgBatch,
-     math.floor(offsets.x - level.zoomX * (level.mapX % 1) * level.tiles.size),
-     math.floor(offsets.y - level.zoomY * (level.mapY % 1) * level.tiles.size),
-    0, level.zoomX, level.zoomY)
+  for i, batch in ipairs(level.bgBatch) do
+    love.graphics.draw(batch,
+       math.floor(offsets.x - level.zoomX * (level.mapX % 1) * level.tiles.size),
+       math.floor(offsets.y - level.zoomY * (level.mapY % 1) * level.tiles.size),
+      0, level.zoomX, level.zoomY)
+  end
 end
 
-function drawFg(level, offsets)
+function drawFgRow(row, level, offsets)
   love.graphics.setColor(255, 255, 255, 255)
-  love.graphics.draw(level.fgBatch,
+  love.graphics.draw(level.fgBatch[row],
      math.floor(offsets.x - level.zoomX * (level.mapX % 1) * level.tiles.size),
      math.floor(offsets.y - level.zoomY * (level.mapY % 1) * level.tiles.size),
     0, level.zoomX, level.zoomY)
 end
 
 -- central function for moving the map by whole tiles
-function moveMap(level, dx, dy, m_offset)
+-- input the map-wide coords in 'offsets', this gets updated as tiles
+-- get swapped in and out
+function moveMap(level, targetX, targetY, offsets)
   local oldMapX = level.mapX
   local oldMapY = level.mapY
-  level.mapX = math.max(math.min(level.mapX + dx, level.width - level.tiles.DisplayWidth), 1)
-  level.mapY = math.max(math.min(level.mapY + dy, level.height - level.tiles.DisplayHeight), 1)
-  if level.mapX ~= oldMapX then m_offset.x = m_offset.x + (dx * level.tiles.size * level.zoomX) end
-  if level.mapY ~= oldMapY then m_offset.y = m_offset.y + (dy * level.tiles.size * level.zoomY) end
-  -- only update if we actually moved
+
+  local tzs = level.tiles.size*level.zoomX
+
+  -- translate graphics position to tile position
+  local newX = math.floor(-targetX / tzs)
+  local newY = math.floor(-targetY / tzs)
+
+  -- pin translated position to legal values
+  level.mapX = math.max(math.min(newX, level.width - level.tiles.DisplayWidth), 1)
+  level.mapY = math.max(math.min(newY, level.height - level.tiles.DisplayHeight), 1)
+
+  -- pixel offsets (fractional part of tile offset)
+  offsets.x = targetX + (level.mapX * tzs)
+  offsets.y = targetY + (level.mapY * tzs)
+
+  -- if we actually moved, update the sprite batches
+  -- to swap tiles in and out as needed
   if math.floor(level.mapX) ~= math.floor(oldMapX) or math.floor(level.mapY) ~= math.floor(oldMapY) then
     updateTilesetBatch(level)
   end
@@ -98,15 +114,17 @@ end
 function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWidth, screenHeight)
   level.mapX = 1
   level.mapY = 1
-  level.zoomX = 1
-  level.zoomY = 1
+  level.zoomX = 4
+  level.zoomY = 4
 
   level.tiles.size = tileSize
   level.tiles.DisplayWidth = math.ceil(screenWidth / (tileSize*level.zoomX)) + 3
   level.tiles.DisplayHeight = math.ceil(screenHeight / (tileSize*level.zoomY)) + 2
 
+  level.rowsToDraw = level.tiles.DisplayHeight
+
   level.tiles.image = love.graphics.newImage(imageName)
-  level.tiles.image:setFilter("nearest", "nearest")
+  level.tiles.image:setFilter("linear", "nearest")
 
   local imgWidth = level.tiles.image:getWidth()
   local imgHeight = level.tiles.image:getHeight()
@@ -126,8 +144,12 @@ function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWi
         )
     end
   end
-  level.fgBatch = love.graphics.newSpriteBatch(level.tiles.image,(level.tiles.DisplayWidth * level.tiles.DisplayHeight))
-  level.bgBatch = love.graphics.newSpriteBatch(level.tiles.image,(level.tiles.DisplayWidth * level.tiles.DisplayHeight))
+  level.fgBatch = {}
+  level.bgBatch = {}
+  for j=1,level.tiles.DisplayHeight do
+    level.fgBatch[j] = love.graphics.newSpriteBatch(level.tiles.image, level.tiles.DisplayWidth)
+    level.bgBatch[j] = love.graphics.newSpriteBatch(level.tiles.image, level.tiles.DisplayWidth)
+  end
 end
 
 function updateTilesetBatch(level)
@@ -136,13 +158,14 @@ function updateTilesetBatch(level)
 end
 
 function internalUpdateTilesetBatch(level, batch, map)
-  batch:clear()
+  --batch:clear()
   local mw = math.min(level.width,  level.tiles.DisplayWidth)
   local mh = math.min(level.height, level.tiles.DisplayHeight)
   local q,mx,my
 
-  for x=0, mw-1 do
-    for y=0, mh-1 do
+  for y=0, mh-1 do
+    batch[y+1]:clear()
+    for x=0, mw-1 do
       repeat -- for 'skip' break
         mx = map[x+math.floor(level.mapX)]
         if (mx == nil) then break end
@@ -150,18 +173,18 @@ function internalUpdateTilesetBatch(level, batch, map)
         if (my == nil) then break end
         q = level.tiles.quads[my]
         if (q ~= nil) then
-          batch:add(q, x * level.tiles.size, y * level.tiles.size)
+          batch[y+1]:add(q, x * level.tiles.size, y * level.tiles.size)
         end
       until true -- for 'skip' break
     end
+    batch[y+1]:flush()
   end
-  batch:flush()
 end
 
 local export = {
   load = load,
   drawBg = drawBg,
-  drawFg = drawFg,
+  drawFgRow = drawFgRow,
   moveMap = moveMap
 }
 return export

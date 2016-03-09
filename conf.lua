@@ -6,5 +6,5 @@ function love.conf(t)
   t.window.title = "Survivor"
   t.window.borderless = true
   --t.window.fullscreen = true
-  t.console = true
+  --t.console = true
 end

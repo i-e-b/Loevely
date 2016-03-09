@@ -6,6 +6,8 @@
 -- This library is free software; you can redistribute it and/or modify it
 -- under the terms of the MIT license. See LICENSE for details.
 --
+-- Modified to give original object to finished callbacks
+-- https://github.com/rxi/flux
 
 local flux = { _version = "0.1.4" }
 flux.__index = flux

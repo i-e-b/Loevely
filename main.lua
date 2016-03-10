@@ -21,7 +21,9 @@ local player =
     anim=nil,             -- current stance animation
     moving = false,       -- is player moving between tiles?
     warping = false,      -- is player roving around the sewers?
-    followedBy = nil      -- next element in survivor chain
+    followedBy = nil,     -- next element in survivor chain
+  --waiting = false       -- should skip the next follow turn (survivors)
+  --panic = 0             -- how many rounds of panic left (survivors)
   }
 
 local mapOffset = {x = 1, y = 1} -- pixel offset for scrolling
@@ -36,8 +38,9 @@ function love.load()
   screenWidth, screenHeight = love.graphics.getDimensions( )
   currentLevel = level.load("ztown.tmx", screenWidth, screenHeight);
 
-  playerCentreX = (screenWidth / 2) - (currentLevel.tiles.size / 2)
-  playerCentreY = (screenHeight / 2) - (currentLevel.tiles.size / 2)
+  playerCentreX = (screenWidth / 2) - (currentLevel.zoom * currentLevel.tiles.size / 2)
+  playerCentreY = (screenHeight / 2) - (currentLevel.zoom * currentLevel.tiles.size / 2)
+
   smallfont = love.graphics.newImageFont("smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]\"")
 
   creepSheet = love.graphics.newImage("creeps.png")
@@ -63,11 +66,12 @@ function love.load()
   protoSurvivor.anims['right'] = anim8.newAnimation(grid('1-4',7), 0.1)
   protoSurvivor.anims['left'] = anim8.newAnimation(grid('1-4',8), 0.1)
   protoSurvivor.anims['up'] = anim8.newAnimation(grid('1-4',9), 0.1)
-  protoSurvivor.anims['stand'] = anim8.newAnimation(grid(6,'6-9'), 0.4)
+  protoSurvivor.anims['help'] = anim8.newAnimation(grid(6,'6-9'), 0.4)
+  protoSurvivor.anims['stand'] = anim8.newAnimation(grid(6,'6-7'), 1)
 
   zombies[1] = makeZombie(3,10)
   zombies[2] = makeZombie(27,27)
-  --zombies[3] = makeZombie(2,29)
+  zombies[3] = makeZombie(18,22)
 
   survivors[1] = makeSurvivor(22,16)
   survivors[2] = makeSurvivor(30,16)
@@ -76,14 +80,29 @@ function love.load()
 end
 
 function makeZombie(x,y)
-  local z = {speed=2, x=x+1, y=y, thinking="Brains", anims=protoZombie.anims}
-  z.anim = protoZombie.anims['stand']
+  local newAnims = {}
+  for k,anim in pairs(protoZombie.anims) do
+    newAnims[k] = anim:clone()
+  end
+  local z = {speed=2, x=x+1, y=y, thinking="Brains", anims=newAnims}
+  z.anim = newAnims['stand']
   return z
 end
 
 function makeSurvivor(x,y, name)
-  local s = {speed=4, x=x+1, y=y, thinking="Help!", anims=protoSurvivor.anims, panic = 0}
-  s.anim = protoSurvivor.anims['stand']
+  local newAnims = {}
+  for k,anim in pairs(protoSurvivor.anims) do
+    newAnims[k] = anim:clone()
+  end
+  local s = {speed=4, x=x+1, y=y, thinking="Help!", anims=newAnims, panic = 0}
+  s.anim = newAnims['help']
+
+  s.color = {
+    r = love.math.random(70,255),
+    g = love.math.random(70,255),
+    b = love.math.random(70,255),
+  }
+
   return s
 end
 
@@ -141,6 +160,8 @@ function love.update(dt)
 
   -- centre map around player
   local tilePixelSize = currentLevel.zoom * currentLevel.tiles.size
+  playerCentreX = (screenWidth / 2) - (tilePixelSize / 2)
+  playerCentreY = (screenHeight / 2) - (tilePixelSize / 2)
   local targetX = playerCentreX - (player.x * tilePixelSize)
   local targetY = playerCentreY - ((player.y+0.7) * tilePixelSize)
 
@@ -182,6 +203,12 @@ function updateControl()
   elseif input.down  then dy =  1; dx = 0
   elseif input.left  then dx = -1; dy = 0
   elseif input.right then dx =  1; dy = 0 end
+
+  --[[if input.action and currentLevel.zoom < 20 then
+    currentLevel.zoom = currentLevel.zoom + 0.1
+  else
+    currentLevel.zoom = 4
+  end]]
 
   if input.action and (not warping) then
     -- test for a warp. If so, follow it.
@@ -242,20 +269,25 @@ function startMove(ch, duration, dx, dy)
 
   -- update the chain
   if (ch.followedBy) then
-    startMove(ch.followedBy, duration, -- always the same speed as leader
-      ch.x - ch.followedBy.x,
-      ch.y - ch.followedBy.y
-    )
+    if (ch.followedBy.wait) then
+      ch.followedBy.wait = false
+    else
+      startMove(ch.followedBy, duration, -- always the same speed as leader
+        ch.x - ch.followedBy.x,
+        ch.y - ch.followedBy.y
+      )
+    end
   end
 end
 function endMove(ch)
-  if (ch.panic and ch.panic > 0) then
-    ch.panic = ch.panic - 1
-    if (ch.panic < 1) then ch.thinking = "Help!" end
-  end
   -- return to idle animation
   ch.anim = ch.anims['stand']
   ch.flux = nil
+  -- reduce panic
+  if (ch.panic and ch.panic > 0) then
+    ch.panic = ch.panic - 1
+    if (ch.panic < 1) then ch.thinking = "Help!"; ch.anim = ch.anims['help'] end
+  end
   -- unlock movement
   if (ch == player) then
     survivorPickupDetect()
@@ -274,6 +306,7 @@ function survivorPickupDetect()
       if (leader == nil) then -- a lone survivor, join the queue
         surv.followedBy = player.followedBy
         player.followedBy = surv
+        surv.wait = true -- fix conga overlap
         surv.thinking = ""
       else -- we hit our conga line. everyone gets knocked off and set to panic
         bustChain(leader)
@@ -299,9 +332,12 @@ end
 
 -- Draw a frame
 function love.draw()
+  local zts = currentLevel.zoom * currentLevel.tiles.size
+  playerCentreX = (screenWidth / 2) - (zts / 2)
+  playerCentreY = (screenHeight / 2) - (zts / 2)
+
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.setFont(smallfont)
-  local zts = currentLevel.zoom * currentLevel.tiles.size
   local zoom = currentLevel.zoom
   local sceneX = mapOffset.x - zts * currentLevel.mapX
   local sceneY = mapOffset.y - zts * currentLevel.mapY
@@ -325,6 +361,11 @@ function love.draw()
     -- pick chars in slots
     if (charRows[row]) then
       for i,char in ipairs(charRows[row]) do
+        if (char.color) then
+          love.graphics.setColor(char.color.r, char.color.g, char.color.b, 255)
+        else
+            love.graphics.setColor(255, 255, 255, 255)
+        end
         love.graphics.print(char.thinking, math.floor(sceneX + (char.x*zts)), math.floor(sceneY + (char.y+0.4)*zts))
         char.anim:draw(creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
       end

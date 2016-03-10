@@ -98,14 +98,20 @@ function isPassable(level, pos, dx, dy)
   if (x > level.width) or (y > level.height) then return false end
 
   -- for bg, check the target block
-  if not level.passable[level.bg[x][y]] then return false end
+  if not safePass(level.passable,level.bg,x,y) then return false end
 
   -- for fg, if it blocks, you can go into it with  dy=1 or 0
   --         but you can only leave it with dy=-1 or 0
   if (dy == 0) then return true end
-  if (dy == -1) and (level.passable[level.fg[pos.x][pos.y]]) then return true end
-  if (dy == 1) and (level.passable[level.fg[pos.x][pos.y+1]]) then return true end
+  if (dy == -1) and (safePass(level.passable,level.fg,pos.x,pos.y)) then return true end
+  if (dy == 1) and (safePass(level.passable,level.fg,pos.x,pos.y+1)) then return true end
   return false
+end
+
+function safePass(p, m, x, y)
+  if (not m[x]) then error(x..","..y); return false end
+  if (not m[x][y]) then error(x..","..y); return false end
+  return p[m[x][y]]
 end
 
 function tileIndex(raw, tileOffset)

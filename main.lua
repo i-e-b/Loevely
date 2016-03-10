@@ -4,14 +4,28 @@ local level = require "level"
 
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 
-local smallfont
+local creepSheet -- image that has all character frames
+local smallfont  -- in game image font
  -- todo: load positions from level
-local zombie = {speed=2, x=16, y=20, thinking="Brains!", anims={}}
+local zombies = {}
+local survivors = {}
 
-local player = {speed=4, x=16, y=10, thinking="", anims={}}
+local protoZombie = {anims={}}
+local protoSurvivor = {anims={}}
+
+local player =
+  { -- NPCs follow the same structure
+    speed=4, x=16, y=10,  -- tile grid coords
+    thinking="",          -- text above the character
+    anims={},             -- animation sets against the 'creeps' image
+    anim=nil,             -- current stance animation
+    moving = false,       -- is player moving between tiles?
+    warping = false,      -- is player roving around the sewers?
+    followedBy = nil      -- next element in survivor chain
+  }
+
 local mapOffset = {x = 1, y = 1} -- pixel offset for scrolling
-local moving = false -- is player moving? (if so, direction won't change until finished)
-local warping = false -- in player roving around the sewers?
+
 -- Position of touch buttons:
 local buttons = {up={155, 290}, down={155, 430}, left={85, 360}, right={225, 360}, action={900,650}}
 -- currently loaded level data
@@ -26,21 +40,17 @@ function love.load()
   playerCentreY = (screenHeight / 2) - (currentLevel.tiles.size / 2)
   smallfont = love.graphics.newImageFont("smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]\"")
 
-  local creepSheet = love.graphics.newImage("creeps.png")
+  creepSheet = love.graphics.newImage("creeps.png")
   creepSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
-
-  zombie.sheet = creepSheet
-  player.sheet = creepSheet
   local sw = creepSheet:getWidth()
   local sh = creepSheet:getHeight()
 
   local grid = anim8.newGrid(17, 18, sw, sh, 0, 0)
-  zombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)
-  zombie.anims['right'] = anim8.newAnimation(grid('9-12',2), 0.2)
-  zombie.anims['left'] = anim8.newAnimation(grid('9-12',3), 0.2)
-  zombie.anims['up'] = anim8.newAnimation(grid('9-12',4), 0.2)
-  zombie.anims['stand'] = anim8.newAnimation(grid(7,'1-4'), 0.4)
-  zombie.anim = zombie.anims['stand']
+  protoZombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)
+  protoZombie.anims['right'] = anim8.newAnimation(grid('9-12',2), 0.2)
+  protoZombie.anims['left'] = anim8.newAnimation(grid('9-12',3), 0.2)
+  protoZombie.anims['up'] = anim8.newAnimation(grid('9-12',4), 0.2)
+  protoZombie.anims['stand'] = anim8.newAnimation(grid(7,'1-4'), 0.7)
 
   player.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
   player.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
@@ -48,6 +58,32 @@ function love.load()
   player.anims['up'] = anim8.newAnimation(grid('1-4',4), 0.1)
   player.anims['stand'] = anim8.newAnimation(grid(6,'1-3', 6,1, 6,4), {0.8,0.4,0.4,0.7,0.2})
   player.anim = player.anims['stand']
+
+  protoSurvivor.anims['down'] = anim8.newAnimation(grid('1-4',6), 0.1)
+  protoSurvivor.anims['right'] = anim8.newAnimation(grid('1-4',7), 0.1)
+  protoSurvivor.anims['left'] = anim8.newAnimation(grid('1-4',8), 0.1)
+  protoSurvivor.anims['up'] = anim8.newAnimation(grid('1-4',9), 0.1)
+  protoSurvivor.anims['stand'] = anim8.newAnimation(grid(6,'6-9'), 0.4)
+
+  zombies[1] = makeZombie(3,10)
+  zombies[2] = makeZombie(27,27)
+  zombies[3] = makeZombie(2,29)
+
+  survivors[1] = makeSurvivor(22,16, "Pete")
+  survivors[2] = makeSurvivor(30,16, "Mary")
+  survivors[3] = makeSurvivor(7,22, "Bob")
+end
+
+function makeZombie(x,y)
+  local z = {speed=2, x=x+1, y=y, thinking="Brains", anims=protoZombie.anims}
+  z.anim = protoZombie.anims['stand']
+  return z
+end
+
+function makeSurvivor(x,y, name)
+  local s = {speed=4, x=x+1, y=y, thinking=name, anims=protoSurvivor.anims, panic = 0}
+  s.anim = protoSurvivor.anims['stand']
+  return s
 end
 
 function love.keypressed(k)
@@ -58,7 +94,8 @@ end
 
 function updateAnimations(dt)
   flux.update(dt)
-  zombie.anim:update(dt)
+  for i,char in ipairs(zombies)   do char.anim:update(dt) end
+  for i,char in ipairs(survivors) do char.anim:update(dt) end
   player.anim:update(dt)
 end
 
@@ -94,6 +131,10 @@ end
 
 -- Update, with frame time in fractional seconds
 function love.update(dt)
+  -- first, look for impacts that have been drawn already
+  collisionDetect()
+  updateSurvivors()
+
   readInputs()
   updateAnimations(dt)
   updateControl()
@@ -105,6 +146,64 @@ function love.update(dt)
 
   -- adjust display grid and mapOffset
   level.moveMap(currentLevel, targetX, targetY, mapOffset)
+end
+
+function updateSurvivors()
+    for i, surv in ipairs(survivors) do
+      if (surv.panic > 0) and (not surv.flux) then -- run away!
+        surv.thinking = "A"..(string.rep('a',surv.panic)).."!"
+
+        local dx=0
+        local dy=0
+        while (dx == 0) and (dy == 0) do
+          dx = love.math.random( 1, 3 ) - 2
+          dy = love.math.random( 1, 3 ) - 2
+        end
+
+        if level.isPassable(currentLevel, surv, dx, dy) then
+          startMove(surv, 1/surv.speed, dx, dy)
+        else
+          startMove(surv, 1/surv.speed, 0, 0) -- not sure why this would happen?
+        end
+      end
+    end
+end
+
+-- todo: survivor pickup should be at the end of player move, and drop
+-- the first~in~queue check
+function collisionDetect()
+  for i, surv in ipairs(survivors) do
+
+    if (not surv.panic or surv.panic < 1) -- calm enough to be rescued
+        and (surv.x == player.x) and (surv.y == player.y) -- just got walked over
+        and (player.followedBy ~= surv) -- not our immediate follower
+      then -- we hit a survivor. build chain; if already in chain,
+      --  scatter this one and their followers
+      local leader = findInChain(player, surv)
+      if (leader == nil) then -- a lone survivor, join the queue
+        surv.followedBy = player.followedBy
+        player.followedBy = surv
+        surv.thinking = ""
+      else -- we hit our conga line. everyone gets knocked off and set to panic
+        bustChain(leader)
+      end
+    end
+  end
+end
+
+function findInChain(chain, target)
+  if (chain.followedBy == target) then return chain end
+  if (chain.followedBy == nil) then return nil end
+  return findInChain(chain.followedBy, target)
+end
+
+function bustChain(leader)
+  local next = leader.followedBy
+  leader.followedBy = nil
+  if (next) then
+    next.panic = 15 -- this many rounds until they can rejoin
+    bustChain (next)
+  end
 end
 
 function updateControl()
@@ -126,6 +225,7 @@ function updateControl()
   -- static character over moving background
   if not moving and (dx ~= 0 or dy ~= 0) then
     if (level.isPassable(currentLevel, player, dx, dy)) then
+      moving = true
       startMove(player, 1/player.speed, dx, dy)
     else
       dx =  0; dy = 0
@@ -152,9 +252,9 @@ function startWarp()
   end
 end
 
-function startMove(ch, duration, dx, dy, scale)
-  -- lock out player movement
-  moving = true
+function startMove(ch, duration, dx, dy)
+  -- reset character movement
+  if ch.flux then ch.flux:stop() end
 
   -- set directional animation
   if (dx == 1) then ch.anim = ch.anims['right']
@@ -165,18 +265,29 @@ function startMove(ch, duration, dx, dy, scale)
   -- move to next tile
   ch.flux = flux.to(ch, duration, {x=ch.x+dx, y=ch.y+dy })
       :ease("linear"):oncomplete(endMove)
+
+  -- update the chain
+  if (ch.followedBy) then
+    startMove(ch.followedBy, duration, -- always the same speed
+      ch.x - ch.followedBy.x,
+      ch.y - ch.followedBy.y
+    )
+  end
 end
 function endMove(ch)
+  if (ch.panic and ch.panic > 0) then
+    ch.panic = ch.panic - 1
+    if (ch.panic < 1) then ch.thinking = "Help!" end
+  end
   -- return to idle animation
   ch.anim = ch.anims['stand']
   ch.flux = nil
   -- unlock movement
-  moving = false
+  if (ch == player) then moving = false end
 end
 
 -- Draw a frame
 function love.draw()
-
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.setFont(smallfont)
   local zts = currentLevel.zoom * currentLevel.tiles.size
@@ -187,7 +298,13 @@ function love.draw()
   -- assign all the active chars to a draw row, then pick them back out
   -- as we draw
   local charRows = {}
-  appendMap(charRows, zombie, level.posToRow(zombie, currentLevel))
+
+  for i,char in ipairs(zombies) do
+    appendMap(charRows, char, level.posToRow(char, currentLevel))
+  end
+  for i,char in ipairs(survivors) do
+    appendMap(charRows, char, level.posToRow(char, currentLevel))
+  end
   appendMap(charRows, player, level.posToRow(player, currentLevel))
 
   -- todo: scan through rows, draw chars on or above the row
@@ -198,7 +315,7 @@ function love.draw()
     if (charRows[row]) then
       for i,char in ipairs(charRows[row]) do
         love.graphics.print(char.thinking, math.floor(sceneX + (char.x*zts)), math.floor(sceneY + (char.y+0.4)*zts))
-        char.anim:draw(char.sheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
+        char.anim:draw(creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
       end
     end
     level.drawFgRow(row, currentLevel, mapOffset)

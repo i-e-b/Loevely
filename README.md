@@ -3,9 +3,9 @@ Just messing around with Love2D
 
 ##Todo:
 
-* [ ] Touch controls for phone
+* [x] Touch controls for phone
 * [x] Keyboard input
 * [x] Basic animation
 * [ ] Sound
-* [ ] Tile background
+* [x] Tile background
 * [ ] AI / interactions

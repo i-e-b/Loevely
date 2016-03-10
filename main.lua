@@ -1,7 +1,5 @@
--- character animations
-local anim8 = require 'anim8'
--- movement tweening. Modified from standard
-local flux = require "flux"
+local anim8 = require "anim8" -- character animations
+local flux = require "flux"   -- movement tweening. Modified from standard
 local level = require "level"
 
 local screenWidth, screenHeight, playerCentreX, playerCentreY
@@ -9,9 +7,11 @@ local screenWidth, screenHeight, playerCentreX, playerCentreY
 local smallfont
  -- todo: load positions from level
 local zombie = {speed=2, x=16, y=20, thinking="Brains!", anims={}}
+
 local player = {speed=4, x=16, y=10, thinking="", anims={}}
 local mapOffset = {x = 1, y = 1} -- pixel offset for scrolling
 local moving = false -- is player moving? (if so, direction won't change until finished)
+local warping = false -- in player roving around the sewers?
 -- Position of touch buttons:
 local buttons = {up={155, 290}, down={155, 430}, left={85, 360}, right={225, 360}, action={900,650}}
 -- currently loaded level data
@@ -46,15 +46,13 @@ function love.load()
   player.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
   player.anims['left'] = anim8.newAnimation(grid('1-4',3), 0.1)
   player.anims['up'] = anim8.newAnimation(grid('1-4',4), 0.1)
-  player.anims['stand'] = anim8.newAnimation(grid(6,'1-3'), 0.8)
+  player.anims['stand'] = anim8.newAnimation(grid(6,'1-3', 6,1, 6,4), {0.8,0.4,0.4,0.7,0.2})
   player.anim = player.anims['stand']
 end
 
 function love.keypressed(k)
 	if k == 'escape' then
 		love.event.push('quit') -- Quit the game.
-	--elseif k == 'backspace' then
-  --  debug.debug() -- need to be attached to a console, or this freezes everything.
   end
 end
 
@@ -117,7 +115,13 @@ function updateControl()
   elseif input.left  then dx = -1; dy = 0
   elseif input.right then dx =  1; dy = 0 end
 
-  if input.action then player.thinking = "!!!" else player.thinking = "" end
+  if input.action and (not warping) then
+    -- test for a warp. If so, follow it.
+    startWarp()
+  elseif not input.action then
+    player.thinking = ""
+    warping = false -- lock out the warp until the control is lifted
+  end
 
   -- static character over moving background
   if not moving and (dx ~= 0 or dy ~= 0) then
@@ -125,6 +129,25 @@ function updateControl()
       startMove(player, 1/player.speed, dx, dy)
     else
       dx =  0; dy = 0
+    end
+  end
+end
+
+function near(a) return math.floor(a+0.5) end -- crap, but will do for map indexes
+
+function startWarp()
+  player.thinking = "Nothing here"
+  local w = currentLevel.warps[near(player.x)]
+  if w then
+    local loc = w[near(player.y)]
+    if loc then
+      player.thinking = ""
+      warping = true -- lock out the warp until the control is lifted
+      if player.flux then player.flux:stop() end
+      moving = false
+      player.anim = player.anims['stand']
+      player.x = loc.x; player.y = loc.y
+      return
     end
   end
 end
@@ -140,11 +163,13 @@ function startMove(ch, duration, dx, dy, scale)
   elseif (dy == -1) then ch.anim = ch.anims['up'] end
 
   -- move to next tile
-  flux.to(ch, duration, {x=ch.x+dx, y=ch.y+dy }):ease("linear"):oncomplete(endMove)
+  ch.flux = flux.to(ch, duration, {x=ch.x+dx, y=ch.y+dy })
+      :ease("linear"):oncomplete(endMove)
 end
 function endMove(ch)
   -- return to idle animation
-  player.anim = player.anims['stand']
+  ch.anim = ch.anims['stand']
+  ch.flux = nil
   -- unlock movement
   moving = false
 end

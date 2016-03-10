@@ -1,25 +1,25 @@
-
+-- very basic level loader
+-- it is fragile and specialised to this game
 local xml = require "xml"
 local b64 = require "b64"
-local dumper = require "dumper"
 
 function load(filename, screenWidth, screenHeight)
   local xmlTest, xmlError = xml:ParseXmlFile(filename)
   if (xmlError ~= "ok") then error(xmlError) end
-  local lvl = {bg={}, fg={}, tiles={}, passable={}}
+  local lvl = {bg={}, fg={}, tiles={}, passable={}, warps={}}
+
   for i,xmlNode in pairs(xmlTest.ChildNodes) do
-    if (xmlNode.Name == "tileset") then
-      -- read in image name, load the image
+    if (xmlNode.Name == "tileset") then  -- read in image name, load the image
       setupTileset(lvl,
           xmlNode.ChildNodes[1].Attributes.source,
           xmlTest.Attributes.tilewidth,
           xmlTest.Attributes.width, xmlTest.Attributes.height,
           screenWidth, screenHeight)
 
-    elseif (xmlNode.Name == "properties") then
-      -- read warp zones
-    elseif (xmlNode.Name == "layer") then
-      -- decode tile data into a map table
+    elseif (xmlNode.Name == "properties") then  -- read warp zones
+      readWarps(lvl, xmlNode)
+
+    elseif (xmlNode.Name == "layer") then  -- decode tile data into a map table
       local target
       if xmlNode.Attributes.name == "bg" then target = lvl.bg else target = lvl.fg end
 
@@ -207,6 +207,22 @@ function internalUpdateTilesetBatch(level, batch, map)
     end
     batch[y+1]:flush()
   end
+end
+
+function readWarps(level, xmlNode)
+  for i,subXmlNode in pairs(xmlNode.ChildNodes) do
+    if (subXmlNode.Attributes.name == "warp") then
+      local spec = subXmlNode.Attributes.value
+      for x1,y1,x2,y2 in string.gmatch(spec, "(%w+),(%w+):(%w+),(%w+)") do
+        wappend(level.warps, x1,y1,x2,y2)
+        wappend(level.warps, x2,y2,x1,y1)
+      end
+    end
+  end
+end
+function wappend(arry, x1,y1,x2,y2)
+  if not arry[x1+1] then arry[x1+1] = {} end
+  arry[x1+1][0+y1] = {x=x2+1, y=0+y2}
 end
 
 local export = {

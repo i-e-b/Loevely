@@ -67,11 +67,12 @@ function love.load()
 
   zombies[1] = makeZombie(3,10)
   zombies[2] = makeZombie(27,27)
-  zombies[3] = makeZombie(2,29)
+  --zombies[3] = makeZombie(2,29)
 
-  survivors[1] = makeSurvivor(22,16, "Pete")
-  survivors[2] = makeSurvivor(30,16, "Mary")
-  survivors[3] = makeSurvivor(7,22, "Bob")
+  survivors[1] = makeSurvivor(22,16)
+  survivors[2] = makeSurvivor(30,16)
+  survivors[3] = makeSurvivor(7,22)
+  survivors[4] = makeSurvivor(2,29)
 end
 
 function makeZombie(x,y)
@@ -81,7 +82,7 @@ function makeZombie(x,y)
 end
 
 function makeSurvivor(x,y, name)
-  local s = {speed=4, x=x+1, y=y, thinking=name, anims=protoSurvivor.anims, panic = 0}
+  local s = {speed=4, x=x+1, y=y, thinking="Help!", anims=protoSurvivor.anims, panic = 0}
   s.anim = protoSurvivor.anims['stand']
   return s
 end
@@ -132,7 +133,6 @@ end
 -- Update, with frame time in fractional seconds
 function love.update(dt)
   -- first, look for impacts that have been drawn already
-  collisionDetect()
   updateSurvivors()
 
   readInputs()
@@ -169,41 +169,10 @@ function updateSurvivors()
     end
 end
 
--- todo: survivor pickup should be at the end of player move, and drop
--- the first~in~queue check
-function collisionDetect()
-  for i, surv in ipairs(survivors) do
-
-    if (not surv.panic or surv.panic < 1) -- calm enough to be rescued
-        and (surv.x == player.x) and (surv.y == player.y) -- just got walked over
-        and (player.followedBy ~= surv) -- not our immediate follower
-      then -- we hit a survivor. build chain; if already in chain,
-      --  scatter this one and their followers
-      local leader = findInChain(player, surv)
-      if (leader == nil) then -- a lone survivor, join the queue
-        surv.followedBy = player.followedBy
-        player.followedBy = surv
-        surv.thinking = ""
-      else -- we hit our conga line. everyone gets knocked off and set to panic
-        bustChain(leader)
-      end
-    end
-  end
-end
-
-function findInChain(chain, target)
-  if (chain.followedBy == target) then return chain end
-  if (chain.followedBy == nil) then return nil end
-  return findInChain(chain.followedBy, target)
-end
-
-function bustChain(leader)
-  local next = leader.followedBy
-  leader.followedBy = nil
-  if (next) then
-    next.panic = 15 -- this many rounds until they can rejoin
-    bustChain (next)
-  end
+function sameTile(chr1, chr2, c1dx, c1dy)
+  local dx = c1dx or 0
+  local dy = c1dy or 0
+  return (near(chr1.x + dx) == near(chr2.x)) and (near(chr1.y + dy) == near(chr2.y))
 end
 
 function updateControl()
@@ -222,8 +191,12 @@ function updateControl()
     warping = false -- lock out the warp until the control is lifted
   end
 
-  -- static character over moving background
+  -- check for obstructions, and start the move animation
   if not moving and (dx ~= 0 or dy ~= 0) then
+    if (player.followedBy and sameTile(player, player.followedBy, dx, dy)) then
+      -- trying to push back against the chain, panic them rather than blocking
+      bustChain(player)
+    end
     if (level.isPassable(currentLevel, player, dx, dy)) then
       moving = true
       startMove(player, 1/player.speed, dx, dy)
@@ -241,6 +214,7 @@ function startWarp()
   if w then
     local loc = w[near(player.y)]
     if loc then
+      bustChain(player) -- survivors won't follow you into the dark
       player.thinking = ""
       warping = true -- lock out the warp until the control is lifted
       if player.flux then player.flux:stop() end
@@ -268,7 +242,7 @@ function startMove(ch, duration, dx, dy)
 
   -- update the chain
   if (ch.followedBy) then
-    startMove(ch.followedBy, duration, -- always the same speed
+    startMove(ch.followedBy, duration, -- always the same speed as leader
       ch.x - ch.followedBy.x,
       ch.y - ch.followedBy.y
     )
@@ -283,7 +257,44 @@ function endMove(ch)
   ch.anim = ch.anims['stand']
   ch.flux = nil
   -- unlock movement
-  if (ch == player) then moving = false end
+  if (ch == player) then
+    survivorPickupDetect()
+    moving = false
+  end
+end
+
+function survivorPickupDetect()
+  for i, surv in ipairs(survivors) do
+
+    if (not surv.panic or surv.panic < 1) -- calm enough to be rescued
+        and sameTile(surv, player) -- just got walked over
+      then -- we hit a survivor. build chain; if already in chain,
+      --  scatter this one and their followers
+      local leader = findInChain(player, surv)
+      if (leader == nil) then -- a lone survivor, join the queue
+        surv.followedBy = player.followedBy
+        player.followedBy = surv
+        surv.thinking = ""
+      else -- we hit our conga line. everyone gets knocked off and set to panic
+        bustChain(leader)
+      end
+    end
+  end
+end
+
+function findInChain(chain, target)
+  if (chain.followedBy == target) then return chain end
+  if (chain.followedBy == nil) then return nil end
+  return findInChain(chain.followedBy, target)
+end
+
+function bustChain(leader)
+  local next = leader.followedBy
+  leader.followedBy = nil
+  if (next) then
+    next.panic = 15 -- this many rounds until they can rejoin
+    bustChain (next)
+  end
 end
 
 -- Draw a frame

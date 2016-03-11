@@ -251,7 +251,7 @@ function readSafehouses(level, xmlNode)
   for i,subXmlNode in pairs(xmlNode.ChildNodes) do
     if (subXmlNode.Attributes.name == "safe") then
       local spec = subXmlNode.Attributes.value
-      for x1,y1 in string.gmatch(spec, "(%w+),(%w+);") do
+      for x1,y1 in string.gmatch(spec, "(%w+),(%w+)") do
         table.insert(level.safeHouses, {x=x1+1,y=y1, followedBy={}, speed=4 })
       end
     end

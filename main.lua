@@ -41,7 +41,7 @@ local currentLevel
 -- Load non dynamic values
 function love.load()
   screenWidth, screenHeight = love.graphics.getDimensions( )
-  currentLevel = level.load("ztown.tmx", screenWidth, screenHeight);
+  currentLevel = level.load("hospital.tmx", screenWidth, screenHeight);
 
   playerCentreX = (screenWidth / 2) - (currentLevel.zoom * currentLevel.tiles.size / 2)
   playerCentreY = (screenHeight / 2) - (currentLevel.zoom * currentLevel.tiles.size / 2)
@@ -76,7 +76,7 @@ function love.load()
 
   for i,creep in ipairs(currentLevel.placement) do
     if creep.type == 255 then -- player
-      player.x = creep.x; player.y = creep.y
+      player.x = creep.x+1; player.y = creep.y
     elseif creep.type == 254 then -- zombie
       table.insert(zombies, makeZombie(creep.x, creep.y))
     elseif creep.type == 256 then -- survivor
@@ -259,7 +259,7 @@ end
 function near(a) return math.floor(a+0.5) end -- crap, but will do for map indexes
 
 function startWarp()
-  player.thinking = "Nothing here"
+  player.thinking = "?"
   local w = currentLevel.warps[near(player.x)]
   if w then
     local loc = w[near(player.y)]
@@ -382,7 +382,6 @@ function love.draw()
   playerCentreY = (screenHeight / 2) - (zts / 2)
 
   love.graphics.setColor(255, 255, 255, 255)
-  love.graphics.setFont(smallfont)
   local zoom = currentLevel.zoom
   local sceneX = mapOffset.x - zts * currentLevel.mapX
   local sceneY = mapOffset.y - zts * currentLevel.mapY
@@ -411,7 +410,7 @@ function love.draw()
         else
             love.graphics.setColor(255, 255, 255, 255)
         end
-        love.graphics.print(char.thinking, math.floor(sceneX + (char.x*zts)), math.floor(sceneY + (char.y+0.4)*zts), 0, zoom/2)
+        centreSmallString(char.thinking, sceneX + ((char.x+0.5)*zts), sceneY + (char.y+0.4)*zts, zoom/2)
         char.anim:draw(creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
       end
     end
@@ -424,7 +423,8 @@ function love.draw()
   drawControlHints()  --near last, the control outlines
 
   love.graphics.setColor(255, 255, 255, 255)
-  love.graphics.print(GameScore, 10, 30, 0, zoom / 2)
+  love.graphics.print("Score: ", 10, 30, 0, zoom / 2)
+  love.graphics.print(GameScore, 10+(28*zoom), 30, 0, zoom / 2)
   drawFPS()  -- FPS counter- always last.
 end
 
@@ -434,6 +434,12 @@ function appendMap(arry, obj, index)
     return
   end
   table.insert(arry[index], obj)
+end
+
+function centreSmallString(str, x, y, zoom)
+  local w = smallfont:getWidth(str) / 2
+  love.graphics.setFont(smallfont)
+  love.graphics.print(str, math.floor(x - (w*zoom)), math.floor(y), 0, zoom)
 end
 
 function drawFPS()

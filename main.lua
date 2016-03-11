@@ -2,7 +2,9 @@ local anim8 = require "anim8" -- character animations
 local flux = require "flux"   -- movement tweening. Modified from standard
 local level = require "level"
 
-local screenWidth, screenHeight, playerCentreX, playerCentr
+local dumper = require "dumper"
+
+local screenWidth, screenHeight, playerCentreX, playerCentreY
 
 local GameScore = 0
 
@@ -72,14 +74,15 @@ function love.load()
   protoSurvivor.anims['help'] = anim8.newAnimation(grid(6,'6-9'), 0.4)
   protoSurvivor.anims['stand'] = anim8.newAnimation(grid(6,'6-7'), 1)
 
-  zombies[1] = makeZombie(3,10)
-  zombies[2] = makeZombie(27,27)
-  zombies[3] = makeZombie(18,22)
-
-  survivors[1] = makeSurvivor(22,16)
-  survivors[2] = makeSurvivor(30,16)
-  survivors[3] = makeSurvivor(7,22)
-  survivors[4] = makeSurvivor(2,29)
+  for i,creep in ipairs(currentLevel.placement) do
+    if creep.type == 255 then -- player
+      player.x = creep.x; player.y = creep.y
+    elseif creep.type == 254 then -- zombie
+      table.insert(zombies, makeZombie(creep.x, creep.y))
+    elseif creep.type == 256 then -- survivor
+      table.insert(survivors, makeSurvivor(creep.x, creep.y))
+    end
+  end
 end
 
 function makeZombie(x,y)
@@ -97,7 +100,7 @@ function makeSurvivor(x,y, name)
   for k,anim in pairs(protoSurvivor.anims) do
     newAnims[k] = anim:clone()
   end
-  local s = {speed=4, x=x+1, y=y, thinking="Help!", anims=newAnims, panic = 0}
+  local s = {speed=4, score=100, x=x+1, y=y, thinking="Help!", anims=newAnims, panic = 0}
   s.anim = newAnims['help']
 
   s.color = {
@@ -187,8 +190,10 @@ function updateSurvivors()
       if safe then
         GameScore = GameScore + surv.score
         table.remove(survivors, i)
-        startMoveChain(safe)
-        safe.followedBy = surv.followedBy
+        if (surv.followedBy) then
+          startMoveChain(safe)
+          safe.followedBy = surv.followedBy
+        end
       elseif (surv.panic > 0) and (not surv.flux) then -- run away!
         surv.thinking = "A"..(string.rep('a',surv.panic)).."!"
 
@@ -308,8 +313,8 @@ function endMove(ch)
 end
 
 function startMoveChain(ch, duration)
-  duration = duration or (1/ch.speed)
-  if (ch.followedBy) then
+  if (ch and ch.followedBy) then
+    duration = duration or (1/ch.speed)
     if (ch.followedBy.wait) then
       ch.followedBy.wait = false
     else

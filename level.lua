@@ -12,7 +12,10 @@ local b64 = require "b64"
 function load(filename, screenWidth, screenHeight)
   local xmlTest, xmlError = xml:ParseXmlFile(filename)
   if (xmlError ~= "ok") then error(xmlError) end
-  local lvl = {bg={}, fg={}, shade={}, tiles={}, passable={}, warps={}, safeHouses={}}
+  local lvl = {
+    bg={}, fg={}, shade={}, placement={},
+    tiles={}, passable={}, warps={}, safeHouses={}
+  }
 
   for i,xmlNode in pairs(xmlTest.ChildNodes) do
     if (xmlNode.Name == "tileset") then  -- read in image name, load the image
@@ -28,25 +31,25 @@ function load(filename, screenWidth, screenHeight)
       readSafehouses(lvl, xmlNode)
 
     elseif (xmlNode.Name == "layer") then  -- decode tile data into a map table
-      local target
-      if xmlNode.Attributes.name == "bg" then
-        target = lvl.bg
-      elseif xmlNode.Attributes.name == "fg" then
-        target = lvl.fg
-      else
-        target = lvl.shade
-      end
+      local data
 
       for i,subXmlNode in pairs(xmlNode.ChildNodes) do
         if (subXmlNode.Name == "data" and subXmlNode.Value) then -- it's a tile array
-          if (subXmlNode.Attributes.encoding ~= "base64"
-          or subXmlNode.Attributes.compression ~= "zlib") then
+          if (subXmlNode.Attributes.encoding ~= "base64" or subXmlNode.Attributes.compression ~= "zlib") then
             error("Layer format must be base64 and zlib compressed")
           end
-
-          setupMap(lvl, target, subXmlNode.Value)
+          data = love.math.decompress(b64.decode(subXmlNode.Value), "zlib" )
         end
       end
+
+      if xmlNode.Attributes.name == "bg" then
+        setupMap(lvl, lvl.bg, data)
+      elseif xmlNode.Attributes.name == "fg" then
+        setupMap(lvl, lvl.fg, data)
+      elseif xmlNode.Attributes.name == "placement" then
+        listCreeps(lvl, lvl.placement, data)
+      end
+
     end
   end
 
@@ -139,19 +142,33 @@ function tileIndex(raw, tileOffset)
   return idx
 end
 
-function setupMap(level, map, encodedData)
+function listCreeps(level, creepList, byteData)
+  if (not byteData) then return end
+  local mapWidth = level.width
+  local mapHeight = level.height
+  local idx
+
+  for x=0,mapWidth do
+    for y=0,mapHeight do
+      idx = tileIndex(byteData, (y*mapWidth)+x)
+      if (idx and idx > 0) then
+        table.insert(creepList, {x=x, y=y, type=0+idx})
+      end
+    end
+  end
+end
+
+function setupMap(level, map, byteData)
+  if (not byteData) then return end
   local mapWidth = level.width
   local mapHeight = level.height
 
-  local tileRawData = love.math.decompress(b64.decode(encodedData), "zlib" )
-
   for x=0,mapWidth do
     map[x+1] = {}
-     for y=0,mapHeight do
-      map[x+1][y+1] = tileIndex(tileRawData, (y*mapWidth)+x)
+    for y=0,mapHeight do
+      map[x+1][y+1] = tileIndex(byteData, (y*mapWidth)+x)
     end
   end
-
 end
 
 function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWidth, screenHeight)

@@ -3,31 +3,45 @@
 local xml = require "xml"
 local b64 = require "b64"
 
+-- levels can have 3 layers: 'bg', 'fg' and 'shade'
+-- 'bg' is required, others are optional.
+-- 'bg' and 'fg' are hit detected, and are drawn in rows to correctly
+-- display with the objects and characters
+-- Shade is for overlay effects and is not hit detected or drawn in rows
+
 function load(filename, screenWidth, screenHeight)
   local xmlTest, xmlError = xml:ParseXmlFile(filename)
   if (xmlError ~= "ok") then error(xmlError) end
-  local lvl = {bg={}, fg={}, tiles={}, passable={}, warps={}}
+  local lvl = {bg={}, fg={}, shade={}, tiles={}, passable={}, warps={}, safeHouses={}}
 
   for i,xmlNode in pairs(xmlTest.ChildNodes) do
     if (xmlNode.Name == "tileset") then  -- read in image name, load the image
       setupTileset(lvl,
-          xmlNode.ChildNodes[1].Attributes.source,
-          xmlTest.Attributes.tilewidth,
-          xmlTest.Attributes.width, xmlTest.Attributes.height,
-          screenWidth, screenHeight)
+        xmlNode.ChildNodes[1].Attributes.source,
+        xmlTest.Attributes.tilewidth,
+        xmlTest.Attributes.width, xmlTest.Attributes.height,
+        screenWidth, screenHeight
+      )
 
     elseif (xmlNode.Name == "properties") then  -- read warp zones
       readWarps(lvl, xmlNode)
+      readSafehouses(lvl, xmlNode)
 
     elseif (xmlNode.Name == "layer") then  -- decode tile data into a map table
       local target
-      if xmlNode.Attributes.name == "bg" then target = lvl.bg else target = lvl.fg end
+      if xmlNode.Attributes.name == "bg" then
+        target = lvl.bg
+      elseif xmlNode.Attributes.name == "fg" then
+        target = lvl.fg
+      else
+        target = lvl.shade
+      end
 
       for i,subXmlNode in pairs(xmlNode.ChildNodes) do
         if (subXmlNode.Name == "data" and subXmlNode.Value) then -- it's a tile array
           if (subXmlNode.Attributes.encoding ~= "base64"
-            or subXmlNode.Attributes.compression ~= "zlib") then
-              error("Layer format must be base64 and zlib compressed")
+          or subXmlNode.Attributes.compression ~= "zlib") then
+            error("Layer format must be base64 and zlib compressed")
           end
 
           setupMap(lvl, target, subXmlNode.Value)
@@ -49,6 +63,7 @@ function drawBgRow(row, level, offsets)
 end
 
 function drawFgRow(row, level, offsets)
+  if not level.fgBatch[row] then return end
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.draw(level.fgBatch[row],
       math.floor(offsets.x - level.zoom * (level.mapX % 1) * level.tiles.size),
@@ -212,6 +227,17 @@ function internalUpdateTilesetBatch(level, batch, map)
       until true -- for 'skip' break
     end
     batch[y+1]:flush()
+  end
+end
+
+function readSafehouses(level, xmlNode)
+  for i,subXmlNode in pairs(xmlNode.ChildNodes) do
+    if (subXmlNode.Attributes.name == "safe") then
+      local spec = subXmlNode.Attributes.value
+      for x1,y1 in string.gmatch(spec, "(%w+),(%w+);") do
+        table.insert(level.safeHouses, {x=x1+1,y=y1, followedBy={}, speed=4 })
+      end
+    end
   end
 end
 

@@ -2,7 +2,9 @@ local anim8 = require "anim8" -- character animations
 local flux = require "flux"   -- movement tweening. Modified from standard
 local level = require "level"
 
-local screenWidth, screenHeight, playerCentreX, playerCentreY
+local screenWidth, screenHeight, playerCentreX, playerCentr
+
+local GameScore = 0
 
 local creepSheet -- image that has all character frames
 local smallfont  -- in game image font
@@ -24,6 +26,7 @@ local player =
     followedBy = nil,     -- next element in survivor chain
   --waiting = false       -- should skip the next follow turn (survivors)
   --panic = 0             -- how many rounds of panic left (survivors)
+  --locked = false        -- character is locked into an animation, don't interact
   }
 
 local mapOffset = {x = 1, y = 1} -- pixel offset for scrolling
@@ -169,9 +172,24 @@ function love.update(dt)
   level.moveMap(currentLevel, targetX, targetY, mapOffset)
 end
 
+function inSafeHouse(chr)
+  for i,sh in ipairs(currentLevel.safeHouses) do
+    if sameTile(chr, sh) then -- unhook the chain
+      return sh
+    end
+  end
+  return nil
+end
+
 function updateSurvivors()
     for i, surv in ipairs(survivors) do
-      if (surv.panic > 0) and (not surv.flux) then -- run away!
+      local safe = inSafeHouse(surv)
+      if safe then
+        GameScore = GameScore + surv.score
+        table.remove(survivors, i)
+        startMoveChain(safe)
+        safe.followedBy = surv.followedBy
+      elseif (surv.panic > 0) and (not surv.flux) then -- run away!
         surv.thinking = "A"..(string.rep('a',surv.panic)).."!"
 
         local dx=0
@@ -268,6 +286,29 @@ function startMove(ch, duration, dx, dy)
       :ease("linear"):oncomplete(endMove)
 
   -- update the chain
+  startMoveChain(ch, duration)
+end
+function endMove(ch)
+  -- return to idle animation
+  ch.anim = ch.anims['stand']
+  ch.flux = nil
+
+  -- reduce panic (survivors)
+  if (ch.panic and ch.panic > 0) then
+    ch.panic = ch.panic - 1
+    if (ch.panic < 1) then ch.thinking = "Help!"; ch.anim = ch.anims['help'] end
+  end
+
+  if (ch == player) then
+    survivorPickupDetect()
+    local house = inSafeHouse(player)
+    if house then escapeSurvivors(player, house) end
+    moving = false  -- unlock movement
+  end
+end
+
+function startMoveChain(ch, duration)
+  duration = duration or (1/ch.speed)
   if (ch.followedBy) then
     if (ch.followedBy.wait) then
       ch.followedBy.wait = false
@@ -279,28 +320,27 @@ function startMove(ch, duration, dx, dy)
     end
   end
 end
-function endMove(ch)
-  -- return to idle animation
-  ch.anim = ch.anims['stand']
-  ch.flux = nil
-  -- reduce panic
-  if (ch.panic and ch.panic > 0) then
-    ch.panic = ch.panic - 1
-    if (ch.panic < 1) then ch.thinking = "Help!"; ch.anim = ch.anims['help'] end
-  end
-  -- unlock movement
-  if (ch == player) then
-    survivorPickupDetect()
-    moving = false
-  end
+
+function escapeSurvivors(leader, house)
+  lockAndScoreChain(leader.followedBy, 100)
+  house.followedBy = leader.followedBy
+  leader.followedBy = nil
+  startMoveChain(house)
+end
+function lockAndScoreChain(head, score)
+  if (not head) then return end
+  head.locked = true
+  head.wait = false
+  head.score = score
+  lockAndScoreChain(head.followedBy, score * 2)
 end
 
 function survivorPickupDetect()
   for i, surv in ipairs(survivors) do
-
-    if (not surv.panic or surv.panic < 1) -- calm enough to be rescued
-        and sameTile(surv, player) -- just got walked over
-      then -- we hit a survivor. build chain; if already in chain,
+    if    (not surv.locked) -- available for interaction
+      and (not surv.panic or surv.panic < 1) -- calm enough to be rescued
+      and sameTile(surv, player) -- just got walked over
+    then -- we hit a survivor. build chain; if already in chain,
       --  scatter this one and their followers
       local leader = findInChain(player, surv)
       if (leader == nil) then -- a lone survivor, join the queue
@@ -366,7 +406,7 @@ function love.draw()
         else
             love.graphics.setColor(255, 255, 255, 255)
         end
-        love.graphics.print(char.thinking, math.floor(sceneX + (char.x*zts)), math.floor(sceneY + (char.y+0.4)*zts))
+        love.graphics.print(char.thinking, math.floor(sceneX + (char.x*zts)), math.floor(sceneY + (char.y+0.4)*zts), 0, zoom/2)
         char.anim:draw(creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
       end
     end
@@ -377,6 +417,9 @@ function love.draw()
   charRows = nil
 
   drawControlHints()  --near last, the control outlines
+
+  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.print(GameScore, 10, 30, 0, zoom / 2)
   drawFPS()  -- FPS counter- always last.
 end
 

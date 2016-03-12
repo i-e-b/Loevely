@@ -4,13 +4,14 @@ local level = require "level"
 
 local dumper = require "dumper"
 
+local LevelFileName = "hospital.tmx"
+
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 
 local GameScore = 0
 
 local creepSheet -- image that has all character frames
 local smallfont  -- in game image font
- -- todo: load positions from level
 local zombies = {}
 local survivors = {}
 
@@ -26,6 +27,7 @@ local player =
     moving = false,       -- is player moving between tiles?
     warping = false,      -- is player roving around the sewers?
     followedBy = nil,     -- next element in survivor chain
+    visible = true        -- if false, char is not drawn (for warping)
   --waiting = false       -- should skip the next follow turn (survivors)
   --panic = 0             -- how many rounds of panic left (survivors)
   --locked = false        -- character is locked into an animation, don't interact
@@ -41,7 +43,7 @@ local currentLevel
 -- Load non dynamic values
 function love.load()
   screenWidth, screenHeight = love.graphics.getDimensions( )
-  currentLevel = level.load("hospital.tmx", screenWidth, screenHeight);
+  currentLevel = level.load(LevelFileName, screenWidth, screenHeight);
 
   playerCentreX = (screenWidth / 2) - (currentLevel.zoom * currentLevel.tiles.size / 2)
   playerCentreY = (screenHeight / 2) - (currentLevel.zoom * currentLevel.tiles.size / 2)
@@ -85,12 +87,91 @@ function love.load()
   end
 end
 
+function love.keypressed(k)
+	if k == 'escape' then
+		love.event.push('quit') -- Quit the game.
+  end
+end
+
+-- Update, with frame time in fractional seconds
+function love.update(dt)
+  updateZombies()
+  updateSurvivors()
+
+  readInputs()
+  updateAnimations(dt)
+  updateControl()
+
+  testCollisions() -- who gets eaten this time?
+
+  -- centre map around player
+  local tilePixelSize = currentLevel.zoom * currentLevel.tiles.size
+  playerCentreX = (screenWidth / 2) - (tilePixelSize / 2)
+  playerCentreY = (screenHeight / 2) - (tilePixelSize / 2)
+  local targetX = playerCentreX - (player.x * tilePixelSize)
+  local targetY = playerCentreY - ((player.y+0.7) * tilePixelSize)
+
+  -- adjust display grid and mapOffset
+  level.moveMap(currentLevel, targetX, targetY, mapOffset)
+end
+
+-- Draw a frame
+function love.draw()
+  local zts = currentLevel.zoom * currentLevel.tiles.size
+  playerCentreX = (screenWidth / 2) - (zts / 2)
+  playerCentreY = (screenHeight / 2) - (zts / 2)
+
+  love.graphics.setColor(255, 255, 255, 255)
+  local zoom = currentLevel.zoom
+  local sceneX = mapOffset.x - zts * currentLevel.mapX
+  local sceneY = mapOffset.y - zts * currentLevel.mapY
+
+  -- assign all the active chars to a draw row, then pick them back out
+  -- as we draw
+  local charRows = {}
+
+  for i,char in ipairs(zombies) do
+    appendMap(charRows, char, level.posToRow(char, currentLevel))
+  end
+  for i,char in ipairs(survivors) do
+    appendMap(charRows, char, level.posToRow(char, currentLevel))
+  end
+  if (player.visible) then
+    appendMap(charRows, player, level.posToRow(player, currentLevel))
+  end
+
+  -- todo: scan through rows, draw chars on or above the row
+  --       then the fg row.
+  for row = 1, currentLevel.rowsToDraw do
+    level.drawBgRow(row, currentLevel, mapOffset)
+    -- pick chars in slots
+    if (charRows[row]) then
+      for i,char in ipairs(charRows[row]) do
+        if (char.color) then
+          love.graphics.setColor(char.color.r, char.color.g, char.color.b, 255)
+        else
+            love.graphics.setColor(255, 255, 255, 255)
+        end
+        centreSmallString(char.thinking, sceneX + ((char.x+0.5)*zts), sceneY + (char.y+0.4)*zts, zoom/2)
+        char.anim:draw(creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
+      end
+    end
+    level.drawFgRow(row, currentLevel, mapOffset)
+  end
+
+  -- be nice to the gc, assuming it does fast gen 0
+  charRows = nil
+
+  drawControlHints()  --near last, the control outlines
+  drawHUD()  -- FPS counter, score, survivor count - always last.
+end
+
 function makeZombie(x,y)
   local newAnims = {}
   for k,anim in pairs(protoZombie.anims) do
     newAnims[k] = anim:clone()
   end
-  local z = {speed=2, x=x+1, y=y, thinking="Brains", anims=newAnims}
+  local z = {speed=1, x=x+1, y=y, moving=false, thinking="Brains", anims=newAnims}
   z.anim = newAnims['stand']
   return z
 end
@@ -110,12 +191,6 @@ function makeSurvivor(x,y, name)
   }
 
   return s
-end
-
-function love.keypressed(k)
-	if k == 'escape' then
-		love.event.push('quit') -- Quit the game.
-  end
 end
 
 function updateAnimations(dt)
@@ -155,26 +230,6 @@ function triggerClick(x,y)
   if inButton(x,y,buttons.action) then input.action = true end
 end
 
--- Update, with frame time in fractional seconds
-function love.update(dt)
-  -- first, look for impacts that have been drawn already
-  updateSurvivors()
-
-  readInputs()
-  updateAnimations(dt)
-  updateControl()
-
-  -- centre map around player
-  local tilePixelSize = currentLevel.zoom * currentLevel.tiles.size
-  playerCentreX = (screenWidth / 2) - (tilePixelSize / 2)
-  playerCentreY = (screenHeight / 2) - (tilePixelSize / 2)
-  local targetX = playerCentreX - (player.x * tilePixelSize)
-  local targetY = playerCentreY - ((player.y+0.7) * tilePixelSize)
-
-  -- adjust display grid and mapOffset
-  level.moveMap(currentLevel, targetX, targetY, mapOffset)
-end
-
 function inSafeHouse(chr)
   for i,sh in ipairs(currentLevel.safeHouses) do
     if sameTile(chr, sh) then -- unhook the chain
@@ -194,7 +249,8 @@ function updateSurvivors()
           startMoveChain(safe)
           safe.followedBy = surv.followedBy
         end
-      elseif (surv.panic > 0) and (not surv.flux) then -- run away!
+      elseif (surv.panic > 0) and (not surv.flux) then -- run around in a mad panic
+        -- we ignore zombies, so may get eaten. It pays to stay calm!
         surv.thinking = "A"..(string.rep('a',surv.panic)).."!"
 
         local dx=0
@@ -203,14 +259,93 @@ function updateSurvivors()
           dx = love.math.random( 1, 3 ) - 2
           dy = love.math.random( 1, 3 ) - 2
         end
+        dx,dy = nearestPassable(surv, {x=surv.x+dx,y=surv.y+dy})
+        startMove(surv, 1/surv.speed, dx, dy)
 
-        if level.isPassable(currentLevel, surv, dx, dy) then
-          startMove(surv, 1/surv.speed, dx, dy)
-        else
-          startMove(surv, 1/surv.speed, 0, 0) -- not sure why this would happen?
-        end
+      elseif (surv.flee and surv.flee.dist < 3) then -- run away from zombie
+          -- unless we're in a chain. We trust the player (fools...)
+          if not findInChain(player, surv) then
+            local fx,fy = nearestPassable(surv, surv.flee)
+            startMove(surv, 1/surv.speed, fx, fy)
+          end
       end
     end
+end
+
+function updateZombies()
+  local brains = {player}
+  for i,brain in ipairs(survivors) do
+    if (not brain.locked) then -- safehouse chains can't be munched
+      table.insert(brains, brain)
+    end
+  end
+
+  for i, zom in ipairs(zombies) do
+      if not zom.moving then
+      -- Find the nearest brain within 5 moves, or wander aimlessly
+      -- we set an artificial best candidate to define the wander and trigger radius
+      local bestCandidate = {
+        dist=6,
+        x = math.random(1, currentLevel.width), -- generally tend to the middle
+        y = math.random(1, currentLevel.height)
+      }
+      zom.thinking = "uuh"
+      for j, brain in ipairs(brains) do
+        -- inject 'run away' direction into the target
+        local dist = math.abs(zom.x - brain.x) + math.abs(zom.y - brain.y) -- no diagonals, so manhattan distance is fine
+        local dx, dy = pinCardinal(zom, brain) -- flee direction
+        brain.flee = {dist=dist, x=brain.x+dx, y=brain.y+dy}
+        if (dist < bestCandidate.dist) then
+          zom.thinking = "Brains"
+          bestCandidate.dist = dist
+          bestCandidate.x = brain.x
+          bestCandidate.y = brain.y
+        end
+      end
+
+      -- trigger the move (todo: obstacle avoidance)
+      local dx, dy = nearestPassable(zom, bestCandidate)
+      startMove(zom, 1/zom.speed, dx, dy)
+    end
+  end
+end
+
+-- next passable direction (may go back, but doesn't look path finding)
+function nearestPassable(chSrc, chDst)
+    local dx = near(chDst.x - chSrc.x)
+    local dy = near(chDst.y - chSrc.y)
+    local prio; -- make a priority list, check each in turn
+
+    if (dx == 0 and dy == 0) then return 0,0 end
+
+    if (dx > 0) then dx1=1; dx2=-1 else dx2=1; dx1=-1 end
+    if (dy > 0) then dy1=1; dy2=-1 else dy2=1; dy1=-1 end
+
+    if (math.abs(dx) > math.abs(dy)) then
+      prio = {{x=dx1,y=0}, {x=0,y=dy1}, {x=0,y=dy2}, {x=dx2, y=0}}
+    else
+      prio = {{x=0,y=dy1}, {x=dx1,y=0}, {x=dx2, y=0}, {x=0,y=dy2}}
+    end
+
+    for i,p in ipairs(prio) do
+      if level.isPassable(currentLevel, chSrc, p.x, p.y) then
+        return p.x, p.y
+      end
+    end
+    return 0,0
+end
+
+function pinCardinal(chSrc, chDst)
+  local dx = chDst.x - chSrc.x
+  local dy = chDst.y - chSrc.y
+  if (math.abs(dx) > math.abs(dy)) then
+    if (dx > 0) then return 1,0
+    else return -1,0 end
+  else
+    if (dy > 0) then return 0,1
+    elseif (dy < 0) then return 0,-1
+    else return 0,0 end
+  end
 end
 
 function sameTile(chr1, chr2, c1dx, c1dy)
@@ -219,6 +354,7 @@ function sameTile(chr1, chr2, c1dx, c1dy)
   return (near(chr1.x + dx) == near(chr2.x)) and (near(chr1.y + dy) == near(chr2.y))
 end
 
+-- handle actions based on pressed controls
 function updateControl()
   local dx = 0
   local dy = 0
@@ -233,22 +369,22 @@ function updateControl()
     currentLevel.zoom = 4
   end]]
 
-  if input.action and (not warping) then
+  if input.action and (not player.warping) then
     -- test for a warp. If so, follow it.
     startWarp()
   elseif not input.action then
     player.thinking = ""
-    warping = false -- lock out the warp until the control is lifted
+    player.warping = false -- lock out the warp until the control is lifted
   end
 
   -- check for obstructions, and start the move animation
-  if not moving and (dx ~= 0 or dy ~= 0) then
+  if not player.moving and (dx ~= 0 or dy ~= 0) then
     if (player.followedBy and sameTile(player, player.followedBy, dx, dy)) then
       -- trying to push back against the chain, panic them rather than blocking
       bustChain(player)
     end
     if (level.isPassable(currentLevel, player, dx, dy)) then
-      moving = true
+      player.moving = true
       startMove(player, 1/player.speed, dx, dy)
     else
       dx =  0; dy = 0
@@ -261,24 +397,28 @@ function near(a) return math.floor(a+0.5) end -- crap, but will do for map index
 function startWarp()
   player.thinking = "?"
   local w = currentLevel.warps[near(player.x)]
-  if w then
-    local loc = w[near(player.y)]
-    if loc then
-      bustChain(player) -- survivors won't follow you into the dark
-      player.thinking = ""
-      warping = true -- lock out the warp until the control is lifted
-      if player.flux then player.flux:stop() end
-      moving = false
-      player.anim = player.anims['stand']
-      player.x = loc.x; player.y = loc.y
-      return
-    end
-  end
+  if  not w then return end
+  local loc = w[near(player.y)]
+  if not loc then return end
+
+  bustChain(player) -- survivors won't follow you into the dark
+  player.thinking = ""
+  player.warping = true -- lock out the warp until the control is lifted
+  player.moving = true -- lock out movement until warp complete
+  player.visible = false
+  if player.flux then player.flux:stop() end
+  player.flux = flux.to(player, 1, {x=loc.x, y=loc.y }):ease("quadinout"):oncomplete(endWarp)
+end
+function endWarp()
+  player.anim = player.anims['stand']
+  player.visible = true
+  player.moving = false
 end
 
 function startMove(ch, duration, dx, dy)
   -- reset character movement
   if ch.flux then ch.flux:stop() end
+  ch.moving = true -- so movement can be locked
 
   -- set directional animation
   if (dx == 1) then ch.anim = ch.anims['right']
@@ -308,8 +448,8 @@ function endMove(ch)
     survivorPickupDetect()
     local house = inSafeHouse(player)
     if house then escapeSurvivors(player, house) end
-    moving = false  -- unlock movement
   end
+  ch.moving = false  -- unlock movement
 end
 
 function startMoveChain(ch, duration)
@@ -375,59 +515,6 @@ function bustChain(leader)
   end
 end
 
--- Draw a frame
-function love.draw()
-  local zts = currentLevel.zoom * currentLevel.tiles.size
-  playerCentreX = (screenWidth / 2) - (zts / 2)
-  playerCentreY = (screenHeight / 2) - (zts / 2)
-
-  love.graphics.setColor(255, 255, 255, 255)
-  local zoom = currentLevel.zoom
-  local sceneX = mapOffset.x - zts * currentLevel.mapX
-  local sceneY = mapOffset.y - zts * currentLevel.mapY
-
-  -- assign all the active chars to a draw row, then pick them back out
-  -- as we draw
-  local charRows = {}
-
-  for i,char in ipairs(zombies) do
-    appendMap(charRows, char, level.posToRow(char, currentLevel))
-  end
-  for i,char in ipairs(survivors) do
-    appendMap(charRows, char, level.posToRow(char, currentLevel))
-  end
-  appendMap(charRows, player, level.posToRow(player, currentLevel))
-
-  -- todo: scan through rows, draw chars on or above the row
-  --       then the fg row.
-  for row = 1, currentLevel.rowsToDraw do
-    level.drawBgRow(row, currentLevel, mapOffset)
-    -- pick chars in slots
-    if (charRows[row]) then
-      for i,char in ipairs(charRows[row]) do
-        if (char.color) then
-          love.graphics.setColor(char.color.r, char.color.g, char.color.b, 255)
-        else
-            love.graphics.setColor(255, 255, 255, 255)
-        end
-        centreSmallString(char.thinking, sceneX + ((char.x+0.5)*zts), sceneY + (char.y+0.4)*zts, zoom/2)
-        char.anim:draw(creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
-      end
-    end
-    level.drawFgRow(row, currentLevel, mapOffset)
-  end
-
-  -- be nice to the gc, assuming it does fast gen 0
-  charRows = nil
-
-  drawControlHints()  --near last, the control outlines
-
-  love.graphics.setColor(255, 255, 255, 255)
-  love.graphics.print("Score: ", 10, 30, 0, zoom / 2)
-  love.graphics.print(GameScore, 10+(28*zoom), 30, 0, zoom / 2)
-  drawFPS()  -- FPS counter- always last.
-end
-
 function appendMap(arry, obj, index)
   if not arry[index] then
     arry[index] = {obj}
@@ -436,16 +523,28 @@ function appendMap(arry, obj, index)
   table.insert(arry[index], obj)
 end
 
-function centreSmallString(str, x, y, zoom)
+function centreSmallString(str, x, y)
   local w = smallfont:getWidth(str) / 2
   love.graphics.setFont(smallfont)
-  love.graphics.print(str, math.floor(x - (w*zoom)), math.floor(y), 0, zoom)
+  love.graphics.print(str, math.floor(x - w), math.floor(y))
 end
 
-function drawFPS()
+function rightAlignSmallString(str, x, y)
+  local w = smallfont:getWidth(str)
+  love.graphics.setFont(smallfont)
+  love.graphics.print(str, math.floor(x - w), math.floor(y))
+end
+
+function drawHUD()
+  love.graphics.setFont(smallfont)
+
   love.graphics.setColor(255, 128, 0, 255)
-  love.graphics.print("FPS: ", 10, 20)
-  love.graphics.print(love.timer.getFPS(), 44, 20)
+  love.graphics.print("FPS: "..love.timer.getFPS(), 10, 5)
+
+  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.print("Score: "..GameScore, 10, 30)
+
+  rightAlignSmallString("Remaining: "..table.getn(survivors), screenWidth-10, 30)
 end
 
 function drawControlHints()

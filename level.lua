@@ -127,8 +127,8 @@ function isPassable(level, pos, dx, dy)
 end
 
 function safePass(p, m, x, y)
-  if (not m[x]) then error(x..","..y); return false end
-  if (not m[x][y]) then error(x..","..y); return false end
+  if (not m[x]) then return false end
+  if (not m[x][y]) then return false end
   return p[m[x][y]]
 end
 

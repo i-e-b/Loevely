@@ -4,7 +4,7 @@ local level = require "level"
 
 local dumper = require "dumper"
 
-local LevelFileName = "hospital.tmx"
+local LevelFileName = "ztown.tmx"
 
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 
@@ -37,7 +37,7 @@ local player =
 local mapOffset = {x = 1, y = 1} -- pixel offset for scrolling
 
 -- Position of touch buttons:
-local buttons = {up={155, 290}, down={155, 430}, left={85, 360}, right={225, 360}, action={900,650}}
+local buttons = {up={230, 225}, down={230, 495}, left={100, 360}, right={370, 360}, action={1100,500}}
 -- currently loaded level data
 local currentLevel
 
@@ -148,11 +148,11 @@ function love.draw()
     -- pick chars in slots
     if (charRows[row]) then
       for i,char in ipairs(charRows[row]) do
-        if (char.color) then
+        --[[if (char.color) then
           love.graphics.setColor(char.color.r, char.color.g, char.color.b, 255)
         else
             love.graphics.setColor(255, 255, 255, 255)
-        end
+        end]]
         centreSmallString(char.thinking, sceneX + ((char.x+0.5)*zts), sceneY + (char.y+0.4)*zts, zoom/2)
         char.anim:draw(creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
       end
@@ -172,7 +172,7 @@ function makeZombie(x,y)
   for k,anim in pairs(protoZombie.anims) do
     newAnims[k] = anim:clone()
   end
-  local z = {speed=1, x=x+1, y=y, moving=false, thinking="Brains", anims=newAnims}
+  local z = {speed=1, x=x+1, y=y, moving=false, thinking="Gruh?", anims=newAnims}
   z.anim = newAnims['stand']
   return z
 end
@@ -220,7 +220,7 @@ function readInputs()
   end
 end
 function inButton(x,y,b)
-  if (math.abs(x - b[1]) < 50 and math.abs(y - b[2]) < 50)
+  if (math.abs(x - b[1]) < 100 and math.abs(y - b[2]) < 100)
   then return true else return false end
 end
 function triggerClick(x,y)
@@ -273,7 +273,8 @@ function updateSurvivors()
 end
 
 function updateZombies()
-  local brains = {player}
+  local brains = {}
+  if not player.locked then table.insert(brains, player) end
   for i,brain in ipairs(survivors) do
     if (not brain.locked) then -- safehouse chains can't be munched
       brain.flee = nil -- reset flee distance
@@ -289,7 +290,7 @@ function updateZombies()
       x = math.random(1, currentLevel.width), -- generally tend to the middle
       y = math.random(1, currentLevel.height)
     }
-    zom.thinking = "gruuh"
+    if (not zom.locked) then zom.thinking = "gruuh" end
 
     for j, brain in ipairs(brains) do
       -- inject 'run away' direction into the target
@@ -300,7 +301,7 @@ function updateZombies()
       end
 
       if (dist < bestCandidate.dist) then
-        zom.thinking = "Brains"
+        if (not zom.locked) then zom.thinking = "Brains" end
         bestCandidate.dist = dist
         bestCandidate.char = brain
         bestCandidate.x = brain.x
@@ -333,6 +334,7 @@ end
 
 function feedZombie(zombie, eaten)
   local feedingDuration = 3
+  zombie.thinking = "om nom nom"
 
   if (zombie.flux) then zombie.flux:stop() end
   if (eaten.flux) then eaten.flux:stop() end
@@ -469,6 +471,7 @@ function startWarp()
   bustChain(player) -- survivors won't follow you into the dark
   player.thinking = ""
   player.warping = true -- lock out the warp until the control is lifted
+  player.locked = true  -- no munching in transit
   player.moving = true -- lock out movement until warp complete
   player.visible = false
   if player.flux then player.flux:stop() end
@@ -478,6 +481,7 @@ function endWarp()
   player.anim = player.anims['stand']
   player.visible = true
   player.moving = false
+  player.locked = false
 end
 
 function startMove(ch, duration, dx, dy)
@@ -619,11 +623,11 @@ function drawControlHints()
   for itr = 0, 2 do
     love.graphics.setColor(itr*70, itr*70, itr*70, 200)
     -- directions
-    love.graphics.circle("line", buttons.up[1] + itr, buttons.up[2], 50, 4)
-    love.graphics.circle("line", buttons.down[1] + itr, buttons.down[2], 50, 4)
-    love.graphics.circle("line", buttons.left[1] + itr, buttons.left[2], 50, 4)
-    love.graphics.circle("line", buttons.right[1] + itr, buttons.right[2], 50, 4)
+    love.graphics.circle("line", buttons.up[1] + itr, buttons.up[2], 100, 4)
+    love.graphics.circle("line", buttons.down[1] + itr, buttons.down[2], 100, 4)
+    love.graphics.circle("line", buttons.left[1] + itr, buttons.left[2], 100, 4)
+    love.graphics.circle("line", buttons.right[1] + itr, buttons.right[2], 100, 4)
     -- action
-    love.graphics.circle("line", buttons.action[1] + itr, buttons.action[2], 50, 6)
+    love.graphics.circle("line", buttons.action[1] + itr, buttons.action[2], 100, 6)
   end
 end

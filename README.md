@@ -8,6 +8,8 @@ What happens when you mix pac-man and snake, then add zombies?
 * Level design (incl z count)
 * Follow radius
 * Path finding
+* Eaten survivors turn into zombie
+* Fed zombies get quicker
 
 ##Todo:
 Basics

@@ -27,7 +27,8 @@ local player =
     moving = false,       -- is player moving between tiles?
     warping = false,      -- is player roving around the sewers?
     followedBy = nil,     -- next element in survivor chain
-    visible = true        -- if false, char is not drawn (for warping)
+    visible = true,       -- if false, char is not drawn (for warping)
+    lifes = 3             -- when zero, it's game over (only player)
   --waiting = false       -- should skip the next follow turn (survivors)
   --panic = 0             -- how many rounds of panic left (survivors)
   --locked = false        -- character is locked into an animation, don't interact
@@ -61,6 +62,8 @@ function love.load()
   protoZombie.anims['left'] = anim8.newAnimation(grid('9-12',3), 0.2)
   protoZombie.anims['up'] = anim8.newAnimation(grid('9-12',4), 0.2)
   protoZombie.anims['stand'] = anim8.newAnimation(grid(7,'1-4'), 0.7)
+  protoZombie.anims['feedSurvivor'] = anim8.newAnimation(grid(7,'6-7'), 0.4)
+  protoZombie.anims['feedPlayer'] = anim8.newAnimation(grid(7,'8-9'), 0.4)
 
   player.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
   player.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
@@ -101,8 +104,6 @@ function love.update(dt)
   readInputs()
   updateAnimations(dt)
   updateControl()
-
-  testCollisions() -- who gets eaten this time?
 
   -- centre map around player
   local tilePixelSize = currentLevel.zoom * currentLevel.tiles.size
@@ -240,18 +241,24 @@ function inSafeHouse(chr)
 end
 
 function updateSurvivors()
-    for i, surv in ipairs(survivors) do
-      local safe = inSafeHouse(surv)
-      if safe then
-        GameScore = GameScore + surv.score
-        table.remove(survivors, i)
-        if (surv.followedBy) then
-          startMoveChain(safe)
-          safe.followedBy = surv.followedBy
-        end
-      elseif (surv.panic > 0) and (not surv.flux) then -- run around in a mad panic
-        -- we ignore zombies, so may get eaten. It pays to stay calm!
-        surv.thinking = "A"..(string.rep('a',surv.panic)).."!"
+  for i, surv in ipairs(survivors) do
+    local safe = inSafeHouse(surv)
+    if safe then
+      GameScore = GameScore + surv.score
+      table.remove(survivors, i)
+      if (surv.followedBy) then
+        startMoveChain(safe)
+        safe.followedBy = surv.followedBy
+      end
+    elseif (surv.flee and surv.flee.dist < 2 and not surv.flux) then
+      -- run away from zombies
+      -- unless we're in a chain. We trust the player (fools...)
+      if not findInChain(player, surv) then
+        local fx,fy = nearestPassable(surv, surv.flee)
+        startMove(surv, 1/surv.speed, fx,fy)
+      end
+    elseif (surv.panic > 0) and (not surv.moving) then -- run around in a mad panic
+      surv.thinking = "A"..(string.rep('a',surv.panic)).."!"
 
         local dx=0
         local dy=0
@@ -261,51 +268,109 @@ function updateSurvivors()
         end
         dx,dy = nearestPassable(surv, {x=surv.x+dx,y=surv.y+dy})
         startMove(surv, 1/surv.speed, dx, dy)
-
-      elseif (surv.flee and surv.flee.dist < 3) then -- run away from zombie
-          -- unless we're in a chain. We trust the player (fools...)
-          if not findInChain(player, surv) then
-            local fx,fy = nearestPassable(surv, surv.flee)
-            startMove(surv, 1/surv.speed, fx, fy)
-          end
-      end
     end
+  end
 end
 
 function updateZombies()
   local brains = {player}
   for i,brain in ipairs(survivors) do
     if (not brain.locked) then -- safehouse chains can't be munched
+      brain.flee = nil -- reset flee distance
       table.insert(brains, brain)
     end
   end
 
   for i, zom in ipairs(zombies) do
-      if not zom.moving then
-      -- Find the nearest brain within 5 moves, or wander aimlessly
-      -- we set an artificial best candidate to define the wander and trigger radius
-      local bestCandidate = {
-        dist=6,
-        x = math.random(1, currentLevel.width), -- generally tend to the middle
-        y = math.random(1, currentLevel.height)
-      }
-      zom.thinking = "uuh"
-      for j, brain in ipairs(brains) do
-        -- inject 'run away' direction into the target
-        local dist = math.abs(zom.x - brain.x) + math.abs(zom.y - brain.y) -- no diagonals, so manhattan distance is fine
-        local dx, dy = pinCardinal(zom, brain) -- flee direction
+    -- Find the nearest brain within 5 moves, or wander aimlessly
+    -- we set an artificial best candidate to define the wander and trigger radius
+    local bestCandidate = {
+      dist=6,
+      x = math.random(1, currentLevel.width), -- generally tend to the middle
+      y = math.random(1, currentLevel.height)
+    }
+    zom.thinking = "gruuh"
+
+    for j, brain in ipairs(brains) do
+      -- inject 'run away' direction into the target
+      local dist = math.abs(zom.x - brain.x) + math.abs(zom.y - brain.y) -- no diagonals, so manhattan distance is fine
+      local dx, dy = pinCardinal(zom, brain) -- flee direction
+      if (not brain.flee) or (brain.flee.dist > dist) then -- always flee the nearest zombie!
         brain.flee = {dist=dist, x=brain.x+dx, y=brain.y+dy}
-        if (dist < bestCandidate.dist) then
-          zom.thinking = "Brains"
-          bestCandidate.dist = dist
-          bestCandidate.x = brain.x
-          bestCandidate.y = brain.y
-        end
       end
 
-      -- trigger the move (todo: obstacle avoidance)
+      if (dist < bestCandidate.dist) then
+        zom.thinking = "Brains"
+        bestCandidate.dist = dist
+        bestCandidate.char = brain
+        bestCandidate.x = brain.x
+        bestCandidate.y = brain.y
+      end
+    end
+
+    if (not zom.locked) and (bestCandidate.dist < 0.8) then -- should be 1, but give some near miss
+      local chain = findInChain(player, bestCandidate.char)
+      if chain then
+        bustChain(chain, 14) -- everyone panic!
+      end
+      feedZombie(zom, bestCandidate.char)  -- flip the animation, flux triggers back to normal
+      removeSurvivor(bestCandidate.char)
+    end
+
+    if (not zom.moving) and (not zom.locked) then
       local dx, dy = nearestPassable(zom, bestCandidate)
       startMove(zom, 1/zom.speed, dx, dy)
+    end
+  end
+end
+
+function loseLife()
+  -- todo: bash zombie away and return control.
+  player.moving = false
+  player.visible = true
+  --error('oops, you died!')
+end
+
+function feedZombie(zombie, eaten)
+  local feedingDuration = 3
+
+  if (zombie.flux) then zombie.flux:stop() end
+  if (eaten.flux) then eaten.flux:stop() end
+  zombie.moving = true
+  zombie.locked = true
+
+  zombie.x = near(eaten.x)
+  zombie.y = near(eaten.y)
+  eaten.x = near(eaten.x)
+  eaten.y = near(eaten.y)
+
+  if (player == eaten) then -- game over, man
+    zombie.anim = zombie.anims['feedPlayer']
+    player.visible = false
+    if (player.flux) then player.flux:stop() end
+    player.moving = true
+    player.lifes = player.lifes - 1
+
+    player.flux = flux.to(player, feedingDuration / 2, {x = player.x}):oncomplete(loseLife)
+  else -- oops. Not a survivor anymore.
+    zombie.anim = zombie.anims['feedSurvivor']
+  end
+
+  zombie.flux = flux.to(zombie, feedingDuration, {x = zombie.x}):oncomplete(unlockZombie)
+end
+
+function unlockZombie(zombie)
+  zombie.moving = false
+  zombie.locked = false
+
+end
+
+function removeSurvivor(deadOne)
+  for i, surv in ipairs(survivors) do
+    if (surv == deadOne) then
+      table.remove(survivors, i)
+      GameScore = GameScore - 100 -- same as saving one.
+      return
     end
   end
 end
@@ -500,18 +565,21 @@ function survivorPickupDetect()
   end
 end
 
+-- find the leader of the target if it's in the chain
 function findInChain(chain, target)
   if (chain.followedBy == target) then return chain end
   if (chain.followedBy == nil) then return nil end
   return findInChain(chain.followedBy, target)
 end
 
-function bustChain(leader)
+function bustChain(leader, panicTurns)
+  panicTurns = panicTurns or 8
   local next = leader.followedBy
   leader.followedBy = nil
   if (next) then
-    next.panic = 15 -- this many rounds until they can rejoin
-    bustChain (next)
+    next.locked = false
+    next.panic = panicTurns -- this many rounds until they can rejoin or flee
+    bustChain (next, panicTurns)
   end
 end
 

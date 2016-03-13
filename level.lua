@@ -208,8 +208,9 @@ function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWi
   end
 
   -- hard coded passability. Todo: find a *nice* way to do this from the map file
-  for i,n in ipairs({18,20,21,22,36,37,38,39,40,41,64,101}) do level.passable[n] = true end
-  for i,n in ipairs({110,111,112,126,127,128,158,159,190,191,222,223}) do level.passable[n] = false end
+  for i,n in ipairs({18,20,36,39,40,41,64,101}) do level.passable[n] = true end
+  for i,n in ipairs({110,111,112,126,127,128,158,159,190,191,206,207,222,223}) do
+    level.passable[n] = false end
 
   level.fgBatch = {}
   level.bgBatch = {}

@@ -14,7 +14,7 @@
  </layer>
  <layer name="fg" width="32" height="32">
   <data encoding="base64" compression="zlib">
-   eJztlWsKQFAQhf1AXsUOWIWyGytjTdiQ80dNE5mruV7NV1+h2zR3Gp0g+Bc9LGElPD8wNahho1TLMO5ggjNcDp7pN2OfDOaweLoRAR17H5k+2XZJQutYm99LiiQHtDIigalCHcpElJyVzv8KZ3PycX8XJDMyvkkIIwcp2/+jkXNaO077+UP+vi0j+T7Ez7ZjGLeyAi9iIwY=
+   eJztldkJgEAMRP1Q8apHsBsr05rUErQDLcD5EUJQzErWizx4oLKEbIhMEPyLGo5wEp5vmBrMcFGqZRh30MEeDgfP9JuxTwZzWDzdiICKvbdMn2y7JKF0rM3vJUWSA1oZkcBUoQ6lI0rOSud/hbM5+bi/C5IZGd8khJGDlO3/0cg5rR2n/fwhf9+WkXwf4mfbMYxbWQGZYSZW
   </data>
  </layer>
  <layer name="placement" width="32" height="32">

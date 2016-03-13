@@ -2,13 +2,15 @@ local anim8 = require "anim8" -- character animations
 local flux = require "flux"   -- movement tweening. Modified from standard
 local level = require "level"
 
-local dumper = require "dumper"
+-- todo: read this from settings file
+local ShowTouchControls = love.system.getOS() == "Android"
 
 local LevelFileName = "ztown.tmx"
 
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 
 local GameScore = 0
+local FeedingDuration = 3 -- shorter is harder
 
 local creepSheet -- image that has all character frames
 local smallfont  -- in game image font
@@ -64,7 +66,9 @@ function love.load()
   protoZombie.anims['stand'] = anim8.newAnimation(grid(7,'1-4'), 0.7)
   protoZombie.anims['feedSurvivor'] = anim8.newAnimation(grid(7,'6-7'), 0.4)
   protoZombie.anims['feedPlayer'] = anim8.newAnimation(grid(7,'8-9'), 0.4)
+  protoZombie.anims['sleep'] = anim8.newAnimation(grid(8,'6-7'), 0.7)
 
+  player.anims['life'] = anim8.newAnimation(grid('1-2',11), {4,0.4})
   player.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
   player.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
   player.anims['left'] = anim8.newAnimation(grid('1-4',3), 0.1)
@@ -141,19 +145,18 @@ function love.draw()
     appendMap(charRows, player, level.posToRow(player, currentLevel))
   end
 
-  -- todo: scan through rows, draw chars on or above the row
-  --       then the fg row.
+  -- scan through rows, draw back ground, then chars, then the fg row.
   for row = 1, currentLevel.rowsToDraw do
     level.drawBgRow(row, currentLevel, mapOffset)
     -- pick chars in slots
     if (charRows[row]) then
       for i,char in ipairs(charRows[row]) do
-        --[[if (char.color) then
+        if (char.color) then -- tints
           love.graphics.setColor(char.color.r, char.color.g, char.color.b, 255)
         else
-            love.graphics.setColor(255, 255, 255, 255)
-        end]]
-        centreSmallString(char.thinking, sceneX + ((char.x+0.5)*zts), sceneY + (char.y+0.4)*zts, zoom/2)
+          love.graphics.setColor(255, 255, 255, 255)
+        end
+        centreSmallString(char.thinking, sceneX + ((char.x+0.5)*zts), sceneY + (char.y+0.4)*zts, zoom/4)
         char.anim:draw(creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
       end
     end
@@ -186,9 +189,9 @@ function makeSurvivor(x,y, name)
   s.anim = newAnims['help']
 
   s.color = {
-    r = love.math.random(70,255),
-    g = love.math.random(70,255),
-    b = love.math.random(70,255),
+    r = love.math.random(120,255),
+    g = love.math.random(120,255),
+    b = love.math.random(120,255),
   }
 
   return s
@@ -199,6 +202,7 @@ function updateAnimations(dt)
   for i,char in ipairs(zombies)   do char.anim:update(dt) end
   for i,char in ipairs(survivors) do char.anim:update(dt) end
   player.anim:update(dt)
+  player.anims['life']:update(dt)
 end
 
 local input = {up=false, down=false, left=false, right=false, action=false}
@@ -289,6 +293,8 @@ function updateZombies()
       dist=6,
       x = math.random(1, currentLevel.width), -- generally tend to the middle
       y = math.random(1, currentLevel.height)
+      --[[ x = zom.x + (math.random(0, 2) - 1), -- wander at random, less biased
+      y = zom.y + (math.random(0, 2) - 1)]]
     }
     if (not zom.locked) then zom.thinking = "gruuh" end
 
@@ -333,7 +339,6 @@ function loseLife()
 end
 
 function feedZombie(zombie, eaten)
-  local feedingDuration = 3
   zombie.thinking = "om nom nom"
 
   if (zombie.flux) then zombie.flux:stop() end
@@ -353,18 +358,23 @@ function feedZombie(zombie, eaten)
     player.moving = true
     player.lifes = player.lifes - 1
 
-    player.flux = flux.to(player, feedingDuration / 2, {x = player.x}):oncomplete(loseLife)
+    player.flux = flux.to(player, FeedingDuration, {x = player.x}):oncomplete(loseLife)
   else -- oops. Not a survivor anymore.
     zombie.anim = zombie.anims['feedSurvivor']
   end
 
-  zombie.flux = flux.to(zombie, feedingDuration, {x = zombie.x}):oncomplete(unlockZombie)
+  zombie.flux = flux.to(zombie, FeedingDuration, {x = zombie.x}):oncomplete(sleepZombie)
+end
+
+function sleepZombie(zombie)
+  zombie.thinking = 'zzz'
+  zombie.anim = zombie.anims['sleep']
+  zombie.flux = flux.to(zombie, FeedingDuration, {x = zombie.x}):oncomplete(unlockZombie)
 end
 
 function unlockZombie(zombie)
   zombie.moving = false
   zombie.locked = false
-
 end
 
 function removeSurvivor(deadOne)
@@ -595,10 +605,11 @@ function appendMap(arry, obj, index)
   table.insert(arry[index], obj)
 end
 
-function centreSmallString(str, x, y)
-  local w = smallfont:getWidth(str) / 2
+function centreSmallString(str, x, y, scale)
+  scale = scale or 1
+  local w = scale * smallfont:getWidth(str) / 2
   love.graphics.setFont(smallfont)
-  love.graphics.print(str, math.floor(x - w), math.floor(y))
+  love.graphics.print(str, math.floor(x - w), math.floor(y), 0, scale)
 end
 
 function rightAlignSmallString(str, x, y)
@@ -611,15 +622,19 @@ function drawHUD()
   love.graphics.setFont(smallfont)
 
   love.graphics.setColor(255, 128, 0, 255)
-  love.graphics.print("FPS: "..love.timer.getFPS(), 10, 5)
+  love.graphics.print("FPS: "..love.timer.getFPS(), 10, 5, 0, 0.5)
 
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.print("Score: "..GameScore, 10, 30)
 
   rightAlignSmallString("Remaining: "..table.getn(survivors), screenWidth-10, 30)
+
+  player.anims['life']:draw(creepSheet, 10, screenHeight - 74, 0, 4)
+
 end
 
 function drawControlHints()
+  if not ShowTouchControls then return end
   for itr = 0, 2 do
     love.graphics.setColor(itr*70, itr*70, itr*70, 200)
     -- directions

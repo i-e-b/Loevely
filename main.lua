@@ -5,7 +5,7 @@ local level = require "level"
 -- todo: read this from settings file
 local ShowTouchControls = love.system.getOS() == "Android"
 
-local LevelFileName = "ztown.tmx"
+local LevelFileName = "hospital.tmx"
 
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 
@@ -13,9 +13,14 @@ local GameScore = 0
 local FeedingDuration = 3 -- shorter is harder
 
 local creepSheet -- image that has all character frames
-local smallfont  -- in game image font
+local smallfont, bigfont  -- in game image font
 local zombies = {}
 local survivors = {}
+local gui = {anims={}} -- UI animations
+
+local flashes = {}     -- score animations, bump animations etc
+-- flash must have an x and y (in tile coords) and can have 'text','alpha','anim'
+-- animations are from taken from the 'creeps' sheet
 
 local protoZombie = {anims={}}
 local protoSurvivor = {anims={}}
@@ -52,6 +57,7 @@ function love.load()
   playerCentreY = (screenHeight / 2) - (currentLevel.zoom * currentLevel.tiles.size / 2)
 
   smallfont = love.graphics.newImageFont("smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]\"")
+  bigfont = love.graphics.newImageFont("bigfont.png", "!$'*+,-.0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
   creepSheet = love.graphics.newImage("creeps.png")
   creepSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
@@ -59,6 +65,11 @@ function love.load()
   local sh = creepSheet:getHeight()
 
   local grid = anim8.newGrid(17, 18, sw, sh, 0, 0)
+
+  gui.anims['life'] = anim8.newAnimation(grid('1-2',11), {4,0.4})
+  gui.anims['remaining'] = anim8.newAnimation(grid('1-3',12), 1.4)
+  player.anims['shove'] = anim8.newAnimation(grid(9,'6-11'), 0.04, 'pauseAtEnd')
+
   protoZombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)
   protoZombie.anims['right'] = anim8.newAnimation(grid('9-12',2), 0.2)
   protoZombie.anims['left'] = anim8.newAnimation(grid('9-12',3), 0.2)
@@ -68,7 +79,6 @@ function love.load()
   protoZombie.anims['feedPlayer'] = anim8.newAnimation(grid(7,'8-9'), 0.4)
   protoZombie.anims['sleep'] = anim8.newAnimation(grid(8,'6-7'), 0.7)
 
-  player.anims['life'] = anim8.newAnimation(grid('1-2',11), {4,0.4})
   player.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
   player.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
   player.anims['left'] = anim8.newAnimation(grid('1-4',3), 0.1)
@@ -166,6 +176,17 @@ function love.draw()
   -- be nice to the gc, assuming it does fast gen 0
   charRows = nil
 
+  -- draw any 'flashes'
+  for i, flash in ipairs(flashes) do
+    love.graphics.setColor(255, 255, 255, (flash.alpha or 255))
+    if (flash.text) then
+      love.graphics.print(flash.text, sceneX + zts * flash.x, sceneY + zts * flash.y)
+    end
+    if (flash.anim) then
+      flash.anim:draw(creepSheet, sceneX + zts * flash.x, sceneY + zts * flash.y, 0, zoom)
+    end
+  end
+
   drawControlHints()  --near last, the control outlines
   drawHUD()  -- FPS counter, score, survivor count - always last.
 end
@@ -201,8 +222,10 @@ function updateAnimations(dt)
   flux.update(dt)
   for i,char in ipairs(zombies)   do char.anim:update(dt) end
   for i,char in ipairs(survivors) do char.anim:update(dt) end
+  for i,anim in pairs(gui.anims)  do anim:update(dt) end
+  for i,flash in ipairs(flashes)  do if (flash.anim) then flash.anim:update(dt) end end
+
   player.anim:update(dt)
-  player.anims['life']:update(dt)
 end
 
 local input = {up=false, down=false, left=false, right=false, action=false}
@@ -244,10 +267,38 @@ function inSafeHouse(chr)
   return nil
 end
 
+function shoveFlash(player, surv)
+  local x = (player.x - surv.x) / 2 + surv.x
+  local y = (player.y - surv.y) / 2 + surv.y + 1
+  local flash = {
+    x = x, y = y,
+    alpha = 255,
+    anim = player.anims['shove']:clone()
+  }
+  flux.to(flash, 0.3, {alpha = flash.alpha}):oncomplete(removeFlash)
+  table.insert(flashes, flash)
+end
+
+function scoreFlash(num, x, y)
+  local flash = {
+    x = x, y = y,
+    alpha = 255, text = "+"..num
+  }
+  flux.to(flash, 1, {y = y-1, alpha = 0}):oncomplete(removeFlash)
+  table.insert(flashes, flash)
+end
+
+function removeFlash(flash)
+  for i,v in ipairs(flashes) do
+    if (v == flash) then table.remove(flashes, i); return end
+  end
+end
+
 function updateSurvivors()
   for i, surv in ipairs(survivors) do
     local safe = inSafeHouse(surv)
     if safe then
+      scoreFlash(surv.score, surv.x, surv.y)
       GameScore = GameScore + surv.score
       table.remove(survivors, i)
       if (surv.followedBy) then
@@ -317,6 +368,7 @@ function updateZombies()
 
     if (not zom.locked) and (bestCandidate.dist < 0.8) then -- should be 1, but give some near miss
       local chain = findInChain(player, bestCandidate.char)
+      if (bestCandidate.char == player) then chain = player end
       if chain then
         bustChain(chain, 14) -- everyone panic!
       end
@@ -335,8 +387,9 @@ function loseLife()
   -- todo: bash zombie away and return control.
   player.moving = false
   player.visible = true
-  --error('oops, you died!')
 end
+
+function unlockChar(ch) ch.locked = false end
 
 function feedZombie(zombie, eaten)
   zombie.thinking = "om nom nom"
@@ -356,8 +409,10 @@ function feedZombie(zombie, eaten)
     player.visible = false
     if (player.flux) then player.flux:stop() end
     player.moving = true
+    player.locked = true
     player.lifes = player.lifes - 1
 
+    player.flux = flux.to(player, FeedingDuration*1.4, {x = player.x}):oncomplete(unlockChar)
     player.flux = flux.to(player, FeedingDuration, {x = player.x}):oncomplete(loseLife)
   else -- oops. Not a survivor anymore.
     zombie.anim = zombie.anims['feedSurvivor']
@@ -458,6 +513,7 @@ function updateControl()
   if not player.moving and (dx ~= 0 or dy ~= 0) then
     if (player.followedBy and sameTile(player, player.followedBy, dx, dy)) then
       -- trying to push back against the chain, panic them rather than blocking
+      shoveFlash(player, player.followedBy)
       bustChain(player)
     end
     if (level.isPassable(currentLevel, player, dx, dy)) then
@@ -573,6 +629,7 @@ function survivorPickupDetect()
         surv.wait = true -- fix conga overlap
         surv.thinking = ""
       else -- we hit our conga line. everyone gets knocked off and set to panic
+        shoveFlash(player, surv)
         bustChain(leader)
       end
     end
@@ -627,10 +684,17 @@ function drawHUD()
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.print("Score: "..GameScore, 10, 30)
 
-  rightAlignSmallString("Remaining: "..table.getn(survivors), screenWidth-10, 30)
+  gui.anims['remaining']:draw(creepSheet, screenWidth-74, 14, 0, 4)
+  rightAlignSmallString(table.getn(survivors), screenWidth-84, 30)
 
-  player.anims['life']:draw(creepSheet, 10, screenHeight - 74, 0, 4)
+  gui.anims['life']:draw(creepSheet, 10, screenHeight - 74, 0, 4)
+  love.graphics.print(player.lifes, 84, screenHeight - 50)
 
+  -- just for testing:
+  if (player.lifes < 1) then
+    love.graphics.setFont(bigfont)
+    love.graphics.print("GAME OVER", 200, 200, 0, 4)
+  end
 end
 
 function drawControlHints()

@@ -18,11 +18,11 @@ Basics
 * [x] Basic animation
 * [ ] Sound
 * [x] Tile background
-* [ ] AI / interactions
+* [x] AI / interactions
 
 Specifics
 * [ ] road wrap around
-* [ ] brain munching
+* [x] brain munching
 * [ ] level completion
 * [ ] coins
 * [ ] tutorial levels

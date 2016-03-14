@@ -5,7 +5,7 @@ local level = require "level"
 -- todo: read this from settings file
 local ShowTouchControls = love.system.getOS() == "Android"
 
-local LevelFileName = "hospital.tmx"
+local LevelFileName = "assets/hospital.tmx"
 
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 
@@ -16,7 +16,7 @@ local creepSheet -- image that has all character frames
 local smallfont, bigfont  -- in game image font
 local zombies = {}
 local survivors = {}
-local gui = {anims={}} -- UI animations
+local gui = {anims={}, bloodTint = 255} -- UI animations
 
 local flashes = {}     -- score animations, bump animations etc
 -- flash must have an x and y (in tile coords) and can have 'text','alpha','anim'
@@ -50,16 +50,20 @@ local currentLevel
 
 -- Load non dynamic values
 function love.load()
+
+  love.window.fullscreen = (love.system.getOS() == "Android")
   screenWidth, screenHeight = love.graphics.getDimensions( )
   currentLevel = level.load(LevelFileName, screenWidth, screenHeight);
 
   playerCentreX = (screenWidth / 2) - (currentLevel.zoom * currentLevel.tiles.size / 2)
   playerCentreY = (screenHeight / 2) - (currentLevel.zoom * currentLevel.tiles.size / 2)
 
-  smallfont = love.graphics.newImageFont("smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]\"")
-  bigfont = love.graphics.newImageFont("bigfont.png", "!$'*+,-.0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+  smallfont = love.graphics.newImageFont("assets/smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]\"")
+  smallfont:setFilter("linear", "nearest")
+  bigfont = love.graphics.newImageFont("assets/bigfont.png", "!$'*+,-.0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+  bigfont:setFilter("linear", "nearest")
 
-  creepSheet = love.graphics.newImage("creeps.png")
+  creepSheet = love.graphics.newImage("assets/creeps.png")
   creepSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
   local sw = creepSheet:getWidth()
   local sh = creepSheet:getHeight()
@@ -112,11 +116,14 @@ end
 
 -- Update, with frame time in fractional seconds
 function love.update(dt)
-  updateZombies()
-  updateSurvivors()
+  updateAnimations(dt) -- always do this first or the animations can get glitchy
+
+  if (player.lifes > 0) then
+    updateZombies()
+    updateSurvivors()
+  end
 
   readInputs()
-  updateAnimations(dt)
   updateControl()
 
   -- centre map around player
@@ -145,19 +152,21 @@ function love.draw()
   -- as we draw
   local charRows = {}
 
-  for i,char in ipairs(zombies) do
-    appendMap(charRows, char, level.posToRow(char, currentLevel))
-  end
-  for i,char in ipairs(survivors) do
-    appendMap(charRows, char, level.posToRow(char, currentLevel))
-  end
-  if (player.visible) then
-    appendMap(charRows, player, level.posToRow(player, currentLevel))
+  if (player.lifes > 0) then
+    for i,char in ipairs(zombies) do
+      appendMap(charRows, char, level.posToRow(char, currentLevel))
+    end
+    for i,char in ipairs(survivors) do
+      appendMap(charRows, char, level.posToRow(char, currentLevel))
+    end
+    if (player.visible) then
+      appendMap(charRows, player, level.posToRow(player, currentLevel))
+    end
   end
 
   -- scan through rows, draw back ground, then chars, then the fg row.
   for row = 1, currentLevel.rowsToDraw do
-    level.drawBgRow(row, currentLevel, mapOffset)
+    level.drawBgRow(row, currentLevel, mapOffset, gui.bloodTint)
     -- pick chars in slots
     if (charRows[row]) then
       for i,char in ipairs(charRows[row]) do
@@ -170,7 +179,7 @@ function love.draw()
         char.anim:draw(creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
       end
     end
-    level.drawFgRow(row, currentLevel, mapOffset)
+    level.drawFgRow(row, currentLevel, mapOffset, gui.bloodTint)
   end
 
   -- be nice to the gc, assuming it does fast gen 0
@@ -384,9 +393,10 @@ function updateZombies()
 end
 
 function loseLife()
-  -- todo: bash zombie away and return control.
   player.moving = false
   player.visible = true
+
+  player.lifes = player.lifes - 1
 end
 
 function unlockChar(ch) ch.locked = false end
@@ -410,8 +420,10 @@ function feedZombie(zombie, eaten)
     if (player.flux) then player.flux:stop() end
     player.moving = true
     player.locked = true
-    player.lifes = player.lifes - 1
 
+    if (player.lifes == 1) then -- about to die. Start a fade-out
+      flux.to(gui, FeedingDuration * 2, {bloodTint = 0}):ease("linear")
+    end
     player.flux = flux.to(player, FeedingDuration*1.4, {x = player.x}):oncomplete(unlockChar)
     player.flux = flux.to(player, FeedingDuration, {x = player.x}):oncomplete(loseLife)
   else -- oops. Not a survivor anymore.
@@ -668,6 +680,12 @@ function centreSmallString(str, x, y, scale)
   love.graphics.setFont(smallfont)
   love.graphics.print(str, math.floor(x - w), math.floor(y), 0, scale)
 end
+function centreBigString(str, x, y, scale)
+  scale = scale or 1
+  local w = scale * bigfont:getWidth(str) / 2
+  love.graphics.setFont(bigfont)
+  love.graphics.print(str, math.floor(x - w), math.floor(y - (scale * 13.5)), 0, scale)
+end
 
 function rightAlignSmallString(str, x, y)
   local w = smallfont:getWidth(str)
@@ -691,10 +709,7 @@ function drawHUD()
   love.graphics.print(player.lifes, 84, screenHeight - 50)
 
   -- just for testing:
-  if (player.lifes < 1) then
-    love.graphics.setFont(bigfont)
-    love.graphics.print("GAME OVER", 200, 200, 0, 4)
-  end
+  if (player.lifes < 1) then centreBigString("GAME OVER", screenWidth/2,screenHeight/2,4) end
 end
 
 function drawControlHints()

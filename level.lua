@@ -57,17 +57,19 @@ function load(filename, screenWidth, screenHeight)
   return lvl
 end
 
-function drawBgRow(row, level, offsets)
-  love.graphics.setColor(255, 255, 255, 255)
+function drawBgRow(row, level, offsets, bloodTint)
+  bloodTint = bloodTint or 255
+  love.graphics.setColor(255, bloodTint, bloodTint, 255)
   love.graphics.draw(level.bgBatch[row],
       math.floor(offsets.x - level.zoom * (level.mapX % 1) * level.tiles.size),
       math.floor(offsets.y - level.zoom * (level.mapY % 1) * level.tiles.size),
       0, level.zoom, level.zoom)
 end
 
-function drawFgRow(row, level, offsets)
+function drawFgRow(row, level, offsets, bloodTint)
   if not level.fgBatch[row] then return end
-  love.graphics.setColor(255, 255, 255, 255)
+  bloodTint = bloodTint or 255
+  love.graphics.setColor(255, bloodTint, bloodTint, 255)
   love.graphics.draw(level.fgBatch[row],
       math.floor(offsets.x - level.zoom * (level.mapX % 1) * level.tiles.size),
       math.floor(offsets.y - level.zoom * (level.mapY % 1) * level.tiles.size),
@@ -182,7 +184,7 @@ function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWi
 
   level.rowsToDraw = level.tiles.DisplayHeight
 
-  level.tiles.image = love.graphics.newImage(imageName)
+  level.tiles.image = love.graphics.newImage("assets/"..imageName)
   level.tiles.image:setFilter("linear", "nearest")
 
   local imgWidth = level.tiles.image:getWidth()

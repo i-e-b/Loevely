@@ -3,7 +3,7 @@ local flux = require "flux"   -- movement tweening. Modified from standard
 
 local state_game = require "state_game"
 
-local LevelFileName = "hospital.tmx"
+local LevelFileName = "ztown.tmx"
 
 local screenWidth, screenHeight
 
@@ -40,6 +40,11 @@ end
 
 -- Update, with frame time in fractional seconds
 function love.update(dt)
+  if (GameState.LevelComplete) then
+    GameState.LevelComplete = false
+    state_game.LoadState("hospital.tmx", GameState)
+  end
+
   CurrentGlobalState.Update(dt)
 end
 

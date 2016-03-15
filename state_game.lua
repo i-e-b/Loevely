@@ -29,8 +29,7 @@ local flashes = {}     -- score animations, bump animations etc
 
 local protoZombie = {anims={}}
 local protoSurvivor = {anims={}}
-
-local player =
+local protoPlayer =
   { -- NPCs follow the same structure
     speed=4, x=16, y=10,  -- tile grid coords
     thinking="",          -- text above the character
@@ -44,6 +43,7 @@ local player =
   --panic = 0             -- how many rounds of panic left (survivors)
   --locked = false        -- character is locked into an animation, don't interact
   }
+  local player = nil
 
 -- Load assets and do load-time stuff
 -- Call this before anything else
@@ -59,7 +59,7 @@ function Initialise(coreAssets)
 
   gui.anims['life'] = anim8.newAnimation(grid('1-2',11), {4,0.4})
   gui.anims['remaining'] = anim8.newAnimation(grid('1-3',12), 1.4)
-  player.anims['shove'] = anim8.newAnimation(grid(9,'6-11'), 0.04, 'pauseAtEnd')
+  protoPlayer.anims['shove'] = anim8.newAnimation(grid(9,'6-11'), 0.04, 'pauseAtEnd')
 
   protoZombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)
   protoZombie.anims['right'] = anim8.newAnimation(grid('9-12',2), 0.2)
@@ -70,12 +70,12 @@ function Initialise(coreAssets)
   protoZombie.anims['feedPlayer'] = anim8.newAnimation(grid(7,'8-9'), 0.4)
   protoZombie.anims['sleep'] = anim8.newAnimation(grid(8,'6-7'), 0.7)
 
-  player.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
-  player.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
-  player.anims['left'] = anim8.newAnimation(grid('1-4',3), 0.1)
-  player.anims['up'] = anim8.newAnimation(grid('1-4',4), 0.1)
-  player.anims['stand'] = anim8.newAnimation(grid(6,'1-3', 6,1, 6,4), {0.8,0.4,0.4,0.7,0.2})
-  player.anim = player.anims['stand']
+  protoPlayer.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
+  protoPlayer.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
+  protoPlayer.anims['left'] = anim8.newAnimation(grid('1-4',3), 0.1)
+  protoPlayer.anims['up'] = anim8.newAnimation(grid('1-4',4), 0.1)
+  protoPlayer.anims['stand'] = anim8.newAnimation(grid(6,'1-3', 6,1, 6,4), {0.8,0.4,0.4,0.7,0.2})
+  protoPlayer.anim = protoPlayer.anims['stand']
 
   protoSurvivor.anims['down'] = anim8.newAnimation(grid('1-4',6), 0.1)
   protoSurvivor.anims['right'] = anim8.newAnimation(grid('1-4',7), 0.1)
@@ -89,13 +89,22 @@ end
 function CreateNewGameState()
   return {
     Score = 0,
-    Lives = 5 -- when zero, it's game over
+    Lives = 5, -- when zero, it's game over
+    Level = 1,
+    LevelComplete = false
   }
 end
 
 -- Load a gameState and level ready for play.
 -- Start calling Draw() and Update() to run the level
 function LoadState(levelName, gameState)
+  -- reset per level stuff
+  mapOffset = {x = 1, y = 1} -- pixel offset for scrolling
+  flashes = {}
+  zombies = {}
+  survivors = {}
+  player = deepcopy(protoPlayer)
+
   currentGame = gameState
   currentLevel = level.load("assets/"..levelName, screenWidth, screenHeight);
 
@@ -176,6 +185,9 @@ function Draw()
 end
 
 function Update(dt)
+  if (table.getn(survivors) < 1) then -- level complete
+    currentGame.LevelComplete = true
+  end
   updateAnimations(dt) -- always do this first or the animations can get glitchy
 
   if (currentGame.Lives > 0) then
@@ -196,8 +208,6 @@ function Update(dt)
   -- adjust display grid and mapOffset
   level.moveMap(currentLevel, targetX, targetY, mapOffset)
 end
-
-
 
 function makeZombie(x,y)
   local newAnims = {}
@@ -415,6 +425,8 @@ function feedZombie(zombie, eaten)
 
   if (player == eaten) then -- game over, man
     zombie.anim = zombie.anims['feedPlayer']
+
+    player.anim = player.anims['stand']
     player.visible = false
     if (player.flux) then player.flux:stop() end
     player.moving = true
@@ -708,6 +720,21 @@ function drawHUD()
   love.graphics.print(currentGame.Lives, 84, screenHeight - 50)
 
   if (currentGame.Lives < 1) then centreBigString("GAME OVER", screenWidth/2,screenHeight/2,4) end
+end
+
+function deepcopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[deepcopy(orig_key)] = deepcopy(orig_value)
+        end
+        setmetatable(copy, deepcopy(getmetatable(orig)))
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
 end
 
 function drawControlHints()

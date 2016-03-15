@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="80" height="20" tilewidth="16" tileheight="16">
+ <tileset firstgid="1" name="ztown" tilewidth="16" tileheight="16">
+  <image source="ztown.png" width="256" height="295"/>
+ </tileset>
+ <layer name="bg" width="80" height="20">
+  <data encoding="base64" compression="zlib">
+   eJzt1r1LAzEYBvBoZwUV/BgUtJsfg0JRBL8piP+Agw4urupkHUQnUYq6KQV19KMiVvEf9AlNILy8yV08JOeZ4Ucu17uDPH2aa1MI0fynHhg90Osh9Bqy6IBOpcSccyllzG+gAPmZa+2DT4/1y+tbDH3/OHRBt2VehP7R/C5gFMaIfkt+rv5NwTCMwCQzL0J+9PfbgBWoGlYF38mk/GTfJoys6LwI+XH9S7ouKT+uvy5P8Jzz8Rw+GOZay6LdvzrJru6Z3zRUYBbmYN5xXMn4/f+WYzI/gy+GXqs0I+z94zpVTshP2oJtdbyjjs1z0l0OXZL136TMz9a/NVhXNkT7v4fcF9/hSo2afqbOaQGWYBk2YVF9rjMM3TXOPZnb+iffFYMwpPK4hSPmedce9mDfcAC7hhM4NRxCLWcjzeBRpN8vX+AV3jzv++kYumtcrxrkGrofRu786HtA7oeh92SbPOZH+0f3w8idn3wP1ET4fTjNGDq/KIqi6G/6BvLGlBE=
+  </data>
+ </layer>
+ <layer name="fg" width="80" height="20">
+  <data encoding="base64" compression="zlib">
+   eJzt0jEKwCAMQFG3gu39Rz2cvUF7ALMIIori0FT8Dz6SLQSNwYxDe4Ef8JUSK53S1ZgxrrwZN+yznRl7cZWAlbns5U9/I0i39hILe6RXewkAAAAAW4qPHgzN
+  </data>
+ </layer>
+ <layer name="placement" width="80" height="20">
+  <data encoding="base64" compression="zlib">
+   eJztzjERAAAIBCDtH1pTeD8ICagC4LVOB4CESQcAAADg2AIZ3AEB
+  </data>
+ </layer>
+</map>

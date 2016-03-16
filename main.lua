@@ -2,6 +2,7 @@ local anim8 = require "anim8" -- character animations
 local flux = require "flux"   -- movement tweening. Modified from standard
 
 local state_game = require "state_game"
+local state_levelEnd = require "state_levelEnd"
 
 local levelNames = {"ztown.tmx", "hospital.tmx", "gauntlet.tmx"}
 
@@ -24,8 +25,8 @@ function love.load()
   assets.creepSheet = love.graphics.newImage("assets/creeps.png")
   assets.creepSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
 
-
   state_game.Initialise(assets)
+  state_levelEnd.Initialise(assets)
   GameState = state_game.CreateNewGameState()
   state_game.LoadState(levelNames[1], GameState) -- todo: level is in gamestate, and gets updated on progress
   CurrentGlobalState = state_game
@@ -41,10 +42,11 @@ end
 -- Update, with frame time in fractional seconds
 function love.update(dt)
   if (GameState.LevelComplete) then
-    GameState.LevelComplete = false
-    GameState.Level = GameState.Level + 1
-
-    state_game.LoadState(levelNames[GameState.Level], GameState)
+    state_levelEnd.LoadState(GameState)
+    CurrentGlobalState = state_levelEnd
+    -- TODO: fade and end screen
+    --state_game.AdvanceLevel(GameState)
+    --state_game.LoadState(levelNames[GameState.Level], GameState)
   end
 
   CurrentGlobalState.Update(dt)

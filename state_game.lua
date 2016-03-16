@@ -9,6 +9,7 @@ local level = require "level" -- loading levels from .tmx files
 local ShowTouchControls = love.system.getOS() == "Android"
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 local currentGame -- assumes one loaded at once!
+local inGameTransition -- doing an end of level animation
 
 local assets -- local copy of game-wide assets
 local zombies = {}
@@ -91,8 +92,29 @@ function CreateNewGameState()
     Score = 0,
     Lives = 5, -- when zero, it's game over
     Level = 1,
-    LevelComplete = false
+    LevelComplete = false,
+    LevelTime = 0,
+    LevelSurvivorsEaten = 0,
+    LevelSurvivorsRescued = 0,
+    LevelZombiesMinced = 0,
+    TotalZombiesMinced = 0,
+    TotalSurvivorsRescued = 0,
+    TotalSurvivorsEaten = 0,
+    TotalTime = 0
   }
+end
+
+function AdvanceLevel(gameState)
+  gameState.LevelTime = 0
+  gameState.LevelComplete = false
+  gameState.Level = gameState.Level + 1
+
+  gameState.LevelSurvivorsEaten = 0
+  gameState.LevelSurvivorsRescued = 0
+  gameState.LevelZombiesMinced = 0
+
+  inGameTransition = false
+  gui.bloodTint = 255
 end
 
 -- Load a gameState and level ready for play.
@@ -185,16 +207,21 @@ function Draw()
 end
 
 function Update(dt)
-  if (table.getn(survivors) < 1) then -- level complete
-    currentGame.LevelComplete = true
+  if (table.getn(survivors) < 1) and not inGameTransition then -- level complete
+    inGameTransition = true
+    flux.to(gui, 2, {bloodTint = 0}):ease("linear"):oncomplete(levelComplete)
   end
+
   updateAnimations(dt) -- always do this first or the animations can get glitchy
 
-  if (currentGame.Lives > 0) then
-    updateZombies()
-    updateSurvivors()
+  if (currentGame.Lives < 1) then
+    return
   end
 
+  currentGame.LevelTime = currentGame.LevelTime + dt -- drift, here we come!
+
+  updateZombies()
+  updateSurvivors()
   readInputs()
   updateControl()
 
@@ -207,6 +234,10 @@ function Update(dt)
 
   -- adjust display grid and mapOffset
   level.moveMap(currentLevel, targetX, targetY, mapOffset)
+end
+
+function levelComplete()
+  currentGame.LevelComplete = true
 end
 
 function makeZombie(x,y)
@@ -313,12 +344,14 @@ function removeFlash(flash)
 end
 
 function updateSurvivors()
-  for i, surv in ipairs(survivors) do
+  for i = #survivors, 1, -1 do
+    local surv = survivors[i]
     local safe = inSafeHouse(surv)
     if safe then
       scoreFlash(surv.score, surv.x, surv.y)
       currentGame.Score = currentGame.Score + surv.score
       table.remove(survivors, i)
+      currentGame.LevelSurvivorsRescued = currentGame.LevelSurvivorsRescued + 1
       if (surv.followedBy) then
         startMoveChain(safe)
         safe.followedBy = surv.followedBy
@@ -360,10 +393,10 @@ function updateZombies()
     -- we set an artificial best candidate to define the wander and trigger radius
     local bestCandidate = {
       dist=6,
-      x = math.random(1, currentLevel.width), -- generally tend to the middle
-      y = math.random(1, currentLevel.height)
-      --[[ x = zom.x + (math.random(0, 2) - 1), -- wander at random, less biased
-      y = zom.y + (math.random(0, 2) - 1)]]
+      --[[x = math.random(1, currentLevel.width), -- generally tend to the middle
+      y = math.random(1, currentLevel.height)]]
+      --[[]] x = zom.x + (math.random(0, 2) - 1), -- wander at random, less biased
+      y = zom.y + (math.random(0, 2) - 1)
     }
     if (not zom.locked) then zom.thinking = "gruuh" end
 
@@ -438,6 +471,7 @@ function feedZombie(zombie, eaten)
     player.flux = flux.to(player, FeedingDuration*1.4, {x = player.x}):oncomplete(unlockChar)
     player.flux = flux.to(player, FeedingDuration, {x = player.x}):oncomplete(loseLife)
   else -- oops. Not a survivor anymore.
+    currentGame.LevelSurvivorsEaten = currentGame.LevelSurvivorsEaten + 1
     zombie.anim = zombie.anims['feedSurvivor']
   end
 
@@ -693,9 +727,9 @@ function centreSmallString(str, x, y, scale)
 end
 function centreBigString(str, x, y, scale)
   scale = scale or 1
-  local w = scale * assets.bigfont:getWidth(str) / 2
+  local w = scale * assets.bigfont:getWidth(string.upper(str)) / 2
   love.graphics.setFont(assets.bigfont)
-  love.graphics.print(str, math.floor(x - w), math.floor(y - (scale * 13.5)), 0, scale)
+  love.graphics.print(string.upper(str), math.floor(x - w), math.floor(y - (scale * 13.5)), 0, scale)
 end
 
 function rightAlignSmallString(str, x, y)
@@ -712,6 +746,9 @@ function drawHUD()
 
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.print("Score: "..currentGame.Score, 10, 30)
+
+  centreSmallString(math.floor(currentGame.LevelTime), screenWidth/2, 30)
+
 
   gui.anims['remaining']:draw(assets.creepSheet, screenWidth-74, 14, 0, 4)
   rightAlignSmallString(table.getn(survivors), screenWidth-84, 30)
@@ -755,6 +792,7 @@ return {
   Initialise = Initialise,
   CreateNewGameState = CreateNewGameState,
   LoadState = LoadState,
+  AdvanceLevel = AdvanceLevel,
   Draw = Draw,
   Update = Update
 }

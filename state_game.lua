@@ -106,11 +106,16 @@ function CreateNewGameState()
 end
 
 function AdvanceLevel(gameState)
-  gameState.LevelTime = 0
+  gameState.TotalTime = gameState.TotalTime + gameState.LevelTime
+  gameState.TotalSurvivorsEaten = gameState.TotalSurvivorsEaten + gameState.LevelSurvivorsEaten
+  gameState.TotalSurvivorsRescued = gameState.TotalSurvivorsRescued + gameState.LevelSurvivorsRescued
+  gameState.TotalZombiesMinced = gameState.TotalZombiesMinced + gameState.LevelZombiesMinced
+
   gameState.LevelComplete = false
   gameState.LevelShouldAdvance = false
   gameState.Level = gameState.Level + 1
 
+  gameState.LevelTime = 0
   gameState.LevelSurvivorsEaten = 0
   gameState.LevelSurvivorsRescued = 0
   gameState.LevelZombiesMinced = 0

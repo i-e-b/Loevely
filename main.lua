@@ -3,6 +3,7 @@ local flux = require "flux"   -- movement tweening. Modified from standard
 
 local state_game = require "state_game"
 local state_levelEnd = require "state_levelEnd"
+local state_finalScreen = require "state_finalScreen"
 
 local levelNames = {"ztown.tmx", "hospital.tmx", "gauntlet.tmx", "theRing.tmx"}
 
@@ -31,8 +32,9 @@ function love.load()
 
   state_game.Initialise(assets)
   state_levelEnd.Initialise(assets)
+  state_finalScreen.Initialise(assets)
   GameState = state_game.CreateNewGameState()
-  state_game.LoadState(levelNames[1], GameState) -- todo: level is in gamestate, and gets updated on progress
+  state_game.LoadState(levelNames[GameState.Level], GameState) -- todo: level is in gamestate, and gets updated on progress
   CurrentGlobalState = state_game
 end
 
@@ -41,8 +43,13 @@ function love.update(dt)
   if (GameState.LevelComplete) then
     if (GameState.LevelShouldAdvance) then
       state_game.AdvanceLevel(GameState)
-      state_game.LoadState(levelNames[GameState.Level], GameState)
-      CurrentGlobalState = state_game
+      if (levelNames[GameState.Level]) then
+        state_game.LoadState(levelNames[GameState.Level], GameState)
+        CurrentGlobalState = state_game
+      else
+        state_finalScreen.LoadState(GameState)
+        CurrentGlobalState = state_finalScreen
+      end
     else
       state_levelEnd.LoadState(GameState)
       CurrentGlobalState = state_levelEnd
@@ -52,8 +59,8 @@ function love.update(dt)
   CurrentGlobalState.Update(dt, keyDownCount)
 end
 
-function love.keypressed(key, unicode)
-  if k == 'escape' then
+function love.keypressed(key)
+  if key == 'escape' then
     love.event.push('quit') -- Quit the game.
   end
   keyDownCount = keyDownCount + 1

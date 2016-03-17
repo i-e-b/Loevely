@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.0" orientation="orthogonal" width="49" height="49" tilewidth="16" tileheight="16">
+ <properties>
+  <property name="safe" value="33,26;"/>
+ </properties>
  <tileset firstgid="1" name="ztown" tilewidth="16" tileheight="16">
   <image source="ztown.png" width="256" height="295"/>
  </tileset>
  <layer name="bg" width="49" height="49">
   <data encoding="base64" compression="zlib">
-   eJztzqEBgDAQBLAfhSkZATCVwAisyUkMpupFRHxGVQ0AAAAA4NcWT+wNLrOOWOJscJl1xRp3gwsAAADA1wtnSSpY
+   eJzt0cEJwkAARNENNpLgxasxFQi2ZAnqJUe1BNvMtCDL4grv8K7Dh1lLKSsAAADAjwyx66CjxhT7DjpqHGPuoKPGKZZG27f4xP2Pf3jEGM+G/Ye4xLnR/iuu8W78AwAAAMC3NrXJJVM=
   </data>
  </layer>
  <layer name="fg" width="49" height="49">
   <data encoding="base64" compression="zlib">
-   eJztzjEJAAAIADAbGMH+LY3gIwiyJVgEAAAAADDJ68CCug4AAAAAPNVUvQAv
+   eJztzrENgDAQA8CU6Rgh+88FCwAZgG/oKfgEpDvJre1SAAAAgD87Zh94wT77ADywJPfXyBrZEjdaYvftjPQBOwAAAABfcgE5zAXI
   </data>
  </layer>
  <layer name="placement" width="49" height="49">
   <data encoding="base64" compression="zlib">
-   eJztwTEBAAAAwqD1T20Hb6AAAAAAAAAAAAB4DSWEAAE=
+   eJztziEBAAAIAzDoHxoKIHA3W4JVAQAAAAAvnQ4w6QAAAADAYQHb9wEB
   </data>
  </layer>
 </map>

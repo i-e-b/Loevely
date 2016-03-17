@@ -9,7 +9,7 @@ local level = require "level" -- loading levels from .tmx files
 local ShowTouchControls = love.system.getOS() == "Android"
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 local currentGame -- assumes one loaded at once!
-local inGameTransition -- doing an end of level animation
+local endLevelTransition -- doing an end of level animation
 
 local assets -- local copy of game-wide assets
 local zombies = {}
@@ -92,7 +92,8 @@ function CreateNewGameState()
     Score = 0,
     Lives = 5, -- when zero, it's game over
     Level = 1,
-    LevelComplete = false,
+    LevelComplete = false,      -- end of level state
+    LevelShouldAdvance = false, -- begin next level
     LevelTime = 0,
     LevelSurvivorsEaten = 0,
     LevelSurvivorsRescued = 0,
@@ -107,13 +108,14 @@ end
 function AdvanceLevel(gameState)
   gameState.LevelTime = 0
   gameState.LevelComplete = false
+  gameState.LevelShouldAdvance = false
   gameState.Level = gameState.Level + 1
 
   gameState.LevelSurvivorsEaten = 0
   gameState.LevelSurvivorsRescued = 0
   gameState.LevelZombiesMinced = 0
 
-  inGameTransition = false
+  endLevelTransition = false
   gui.bloodTint = 255
 end
 
@@ -176,12 +178,12 @@ function Draw()
     -- pick chars in slots
     if (charRows[row]) then
       for i,char in ipairs(charRows[row]) do
-        if (char.color) then -- tints
+        if (char.color and not endLevelTransition) then -- tints
           love.graphics.setColor(char.color.r, char.color.g, char.color.b, 255)
         else
-          love.graphics.setColor(255, 255, 255, 255)
+          love.graphics.setColor(255, gui.bloodTint, gui.bloodTint, 255)
         end
-        centreSmallString(char.thinking, sceneX + ((char.x+0.5)*zts), sceneY + (char.y+0.4)*zts, zoom/4)
+        centreSmallString(char.thinking, sceneX + ((char.x+0.5)*zts), sceneY + (char.y+0.4)*zts, zoom/2)
         char.anim:draw(assets.creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
       end
     end
@@ -195,7 +197,7 @@ function Draw()
   for i, flash in ipairs(flashes) do
     love.graphics.setColor(255, 255, 255, (flash.alpha or 255))
     if (flash.text) then
-      love.graphics.print(flash.text, sceneX + zts * flash.x, sceneY + zts * flash.y)
+      love.graphics.print(flash.text, sceneX + zts * flash.x, sceneY + zts * flash.y, 0, zoom / 2)
     end
     if (flash.anim) then
       flash.anim:draw(assets.creepSheet, sceneX + zts * flash.x, sceneY + zts * flash.y, 0, zoom)
@@ -207,8 +209,8 @@ function Draw()
 end
 
 function Update(dt)
-  if (table.getn(survivors) < 1) and not inGameTransition then -- level complete
-    inGameTransition = true
+  if (table.getn(survivors) < 1) and not endLevelTransition then -- level complete
+    endLevelTransition = true
     flux.to(gui, 2, {bloodTint = 0}):ease("linear"):oncomplete(levelComplete)
   end
 
@@ -732,29 +734,30 @@ function centreBigString(str, x, y, scale)
   love.graphics.print(string.upper(str), math.floor(x - w), math.floor(y - (scale * 13.5)), 0, scale)
 end
 
-function rightAlignSmallString(str, x, y)
-  local w = assets.smallfont:getWidth(str)
+function rightAlignSmallString(str, x, y, scale)
+  scale = scale or 1
+  local w = assets.smallfont:getWidth(str) * scale
   love.graphics.setFont(assets.smallfont)
-  love.graphics.print(str, math.floor(x - w), math.floor(y))
+  love.graphics.print(str, math.floor(x - w), math.floor(y), 0, scale)
 end
 
 function drawHUD()
   love.graphics.setFont(assets.smallfont)
 
   love.graphics.setColor(255, 128, 0, 255)
-  love.graphics.print("FPS: "..love.timer.getFPS(), 10, 5, 0, 0.5)
+  love.graphics.print("FPS: "..love.timer.getFPS(), 10, 5, 0, 1)
 
   love.graphics.setColor(255, 255, 255, 255)
-  love.graphics.print("Score: "..currentGame.Score, 10, 30)
+  love.graphics.print("Score: "..currentGame.Score, 10, 30, 0, 2)
 
-  centreSmallString(math.floor(currentGame.LevelTime), screenWidth/2, 30)
+  centreSmallString(math.floor(currentGame.LevelTime), screenWidth/2, 30, 2)
 
 
   gui.anims['remaining']:draw(assets.creepSheet, screenWidth-74, 14, 0, 4)
-  rightAlignSmallString(table.getn(survivors), screenWidth-84, 30)
+  rightAlignSmallString(table.getn(survivors), screenWidth-84, 30, 2)
 
   gui.anims['life']:draw(assets.creepSheet, 10, screenHeight - 74, 0, 4)
-  love.graphics.print(currentGame.Lives, 84, screenHeight - 50)
+  love.graphics.print(currentGame.Lives, 84, screenHeight - 50, 0, 2)
 
   if (currentGame.Lives < 1) then centreBigString("GAME OVER", screenWidth/2,screenHeight/2,4) end
 end

@@ -11,8 +11,12 @@ function Initialise(coreAssets)
   screenWidth, screenHeight = love.graphics.getDimensions( )
 end
 
-function Update(dt)
+function Update(dt, keyDownCount)
   flux.update(dt)
+
+  if (keyDownCount > 0) then
+    currentGame.LevelShouldAdvance = true
+  end
 
   love.graphics.setColor(255, 255, 255, 255)
 end
@@ -22,41 +26,42 @@ function LoadState(gameState)
 end
 
 function Draw()
-  centreBigString("Level Complete", screenWidth / 2, 70, 2)
+
+  love.graphics.setFont(assets.bigfont)
+  centreString("* LEVEL COMPLETE *", screenWidth / 2, 70, 2)
 
   local height = 240
 
   local left = screenWidth / 2 - 24
   local right = left + 48
 
-  rightAlignSmallString("Time taken", left, height)
-  love.graphics.print(math.ceil(currentGame.LevelTime) .. " seconds", right, height)
+  love.graphics.setFont(assets.smallfont)
+  rightAlignString("Time taken", left, height, 2)
+  love.graphics.print(math.ceil(currentGame.LevelTime) .. " seconds", right, height, 0, 2)
 
   height = height + 120
-  rightAlignSmallString("Survivors rescued", left, height)
-  love.graphics.print(currentGame.LevelSurvivorsRescued, right, height)
+  rightAlignString("Survivors rescued", left, height, 2)
+  love.graphics.print(currentGame.LevelSurvivorsRescued, right, height, 0, 2)
 
   height = height + 120
-  rightAlignSmallString("Survivors eaten", left, height)
-  love.graphics.print(currentGame.LevelSurvivorsEaten, right, height)
+  rightAlignString("Survivors eaten", left, height, 2)
+  love.graphics.print(currentGame.LevelSurvivorsEaten, right, height, 0, 2)
 
   height = height + 120
-  rightAlignSmallString("Zombies minced", left, height)
-  love.graphics.print(currentGame.LevelZombiesMinced, right, height)
+  rightAlignString("Zombies minced", left, height, 2)
+  love.graphics.print(currentGame.LevelZombiesMinced, right, height, 0, 2)
 end
 
 -- todo> move these out to a common module?
-function rightAlignSmallString(str, x, y)
-  local w = assets.smallfont:getWidth(str)
-  love.graphics.setFont(assets.smallfont)
-  love.graphics.print(str, math.floor(x - w), math.floor(y))
-end
-function centreBigString(str, x, y, scale)
+function rightAlignString(str, x, y, scale)
   scale = scale or 1
-  local w = scale * assets.bigfont:getWidth(string.upper(str)) / 2
-  love.graphics.setFont(assets.bigfont)
-  -- big font has only caps, to we uppercase the input to save me from my own stupidity
-  love.graphics.print(string.upper(str), math.floor(x - w), math.floor(y - (scale * 13.5)), 0, scale)
+  local w = scale * assets.smallfont:getWidth(str)
+  love.graphics.print(str, math.floor(x - w), math.floor(y), 0,scale)
+end
+function centreString(str, x, y, scale)
+  scale = scale or 1
+  local w = scale * assets.bigfont:getWidth(str) / 2
+  love.graphics.print(str, math.floor(x - w), math.floor(y - (scale * 13.5)), 0, scale)
 end
 
 

@@ -225,7 +225,9 @@ function Update(dt)
     return
   end
 
-  currentGame.LevelTime = currentGame.LevelTime + dt -- drift, here we come!
+  if (dt < 0.5) then -- don't count when paused or background
+    currentGame.LevelTime = currentGame.LevelTime + dt -- drift, here we come!
+  end
 
   updateZombies()
   updateSurvivors()

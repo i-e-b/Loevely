@@ -8,8 +8,16 @@ local flux = require "flux"   -- movement tweening. Modified from standard
 local assets -- local copy of game-wide assets
 local screenWidth, screenHeight
 local currentGame
+local readyForContinue
+local continueMessage
 
 function Initialise(coreAssets)
+  if (love.system.getOS() == "Android") then
+    continueMessage = "touch screen to continue"
+  else
+    continueMessage = "to continue, press any key or click mouse"
+  end
+  readyForContinue = false
   assets = coreAssets
   screenWidth, screenHeight = love.graphics.getDimensions( )
 end
@@ -17,11 +25,12 @@ end
 function Update(dt, keyDownCount)
   flux.update(dt)
 
-  if (keyDownCount > 0) then
+  if (readyForContinue) and (keyDownCount > 0) then
     currentGame.LevelShouldAdvance = true
   end
-
-  love.graphics.setColor(255, 255, 255, 255)
+  if (keyDownCount < 1) then
+    readyForContinue = true
+  end
 end
 
 function LoadState(gameState)
@@ -29,9 +38,10 @@ function LoadState(gameState)
 end
 
 function Draw()
+  love.graphics.setColor(255, 255, 255, 255)
 
   love.graphics.setFont(assets.bigfont)
-  centreString("* LEVEL COMPLETE *", screenWidth / 2, 70, 2)
+  centreBigString("* LEVEL COMPLETE *", screenWidth / 2, 70, 2)
 
   local height = 240
 
@@ -39,6 +49,11 @@ function Draw()
   local right = left + 48
 
   love.graphics.setFont(assets.smallfont)
+  love.graphics.setColor(170, 170, 170, 255)
+  centreSmallString(continueMessage, screenWidth / 2, 120, 2)
+
+
+  love.graphics.setColor(255, 255, 255, 255)
   rightAlignString("Time taken", left, height, 2)
   love.graphics.print(math.ceil(currentGame.LevelTime) .. " seconds", right, height, 0, 2)
 
@@ -61,10 +76,15 @@ function rightAlignString(str, x, y, scale)
   local w = scale * assets.smallfont:getWidth(str)
   love.graphics.print(str, math.floor(x - w), math.floor(y), 0,scale)
 end
-function centreString(str, x, y, scale)
+function centreBigString(str, x, y, scale)
   scale = scale or 1
   local w = scale * assets.bigfont:getWidth(str) / 2
   love.graphics.print(str, math.floor(x - w), math.floor(y - (scale * 13.5)), 0, scale)
+end
+function centreSmallString(str, x, y, scale)
+  scale = scale or 1
+  local w = scale * assets.smallfont:getWidth(str) / 2
+  love.graphics.print(str, math.floor(x - w), math.floor(y), 0, scale)
 end
 
 

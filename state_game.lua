@@ -229,6 +229,8 @@ function Update(dt)
     currentGame.LevelTime = currentGame.LevelTime + dt -- drift, here we come!
   end
 
+  if (endLevelTransition) then return end
+
   updateZombies()
   updateSurvivors()
   readInputs()
@@ -404,8 +406,8 @@ function updateZombies()
       dist=6,
       --[[x = math.random(1, currentLevel.width), -- generally tend to the middle
       y = math.random(1, currentLevel.height)]]
-      --[[]] x = zom.x + (math.random(0, 2) - 1), -- wander at random, less biased
-      y = zom.y + (math.random(0, 2) - 1)
+      --[[]] x = zom.x + math.random(-2, 2), -- wander at random, less biased
+      y = zom.y + math.random(-2, 2)
     }
     if (not zom.locked) then zom.thinking = "gruuh" end
 

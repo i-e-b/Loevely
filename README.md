@@ -21,9 +21,9 @@ Basics
 * [x] AI / interactions
 
 Specifics
-* [ ] road wrap around
+* [-] road wrap around ?
 * [x] brain munching
-* [ ] level completion
-* [ ] coins
+* [x] level completion
+* [ ] coins & weapons
 * [ ] tutorial levels
 * [ ] title screen

@@ -34,7 +34,8 @@ function love.load()
   state_levelEnd.Initialise(assets)
   state_finalScreen.Initialise(assets)
   GameState = state_game.CreateNewGameState()
-  state_game.LoadState(levelNames[GameState.Level], GameState) -- todo: level is in gamestate, and gets updated on progress
+  --GameState.Level = 4
+  state_game.LoadState(levelNames[GameState.Level], GameState)
   CurrentGlobalState = state_game
 end
 

@@ -43,6 +43,7 @@ local protoPlayer =
   --waiting = false       -- should skip the next follow turn (survivors)
   --panic = 0             -- how many rounds of panic left (survivors)
   --locked = false        -- character is locked into an animation, don't interact
+  --hidden = false        -- hidden, will only trigger if a player comes close (zombies)
   }
   local player = nil
 
@@ -70,6 +71,7 @@ function Initialise(coreAssets)
   protoZombie.anims['feedSurvivor'] = anim8.newAnimation(grid(7,'6-7'), 0.4)
   protoZombie.anims['feedPlayer'] = anim8.newAnimation(grid(7,'8-9'), 0.4)
   protoZombie.anims['sleep'] = anim8.newAnimation(grid(8,'6-7'), 0.7)
+  protoZombie.anims['raise'] = anim8.newAnimation(grid(8,'8-10'), 0.333, 'pauseAtEnd')
 
   protoPlayer.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
   protoPlayer.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
@@ -144,7 +146,9 @@ function LoadState(levelName, gameState)
     if creep.type == 255 then -- player
       player.x = creep.x+1; player.y = creep.y
     elseif creep.type == 254 then -- zombie
-      table.insert(zombies, makeZombie(creep.x, creep.y))
+      table.insert(zombies, makeZombie(creep.x, creep.y, false))
+    elseif creep.type == 253 then -- hidden zombie
+      table.insert(zombies, makeZombie(creep.x, creep.y, true))
     elseif creep.type == 256 then -- survivor
       table.insert(survivors, makeSurvivor(creep.x, creep.y))
     end
@@ -167,7 +171,9 @@ function Draw()
 
   if (currentGame.Lives > 0) then
     for i,char in ipairs(zombies) do
-      appendMap(charRows, char, level.posToRow(char, currentLevel))
+      if (not char.hidden) then
+        appendMap(charRows, char, level.posToRow(char, currentLevel))
+      end
     end
     for i,char in ipairs(survivors) do
       appendMap(charRows, char, level.posToRow(char, currentLevel))
@@ -251,12 +257,12 @@ function levelComplete()
   currentGame.LevelComplete = true
 end
 
-function makeZombie(x,y)
+function makeZombie(x,y, hidden)
   local newAnims = {}
   for k,anim in pairs(protoZombie.anims) do
     newAnims[k] = anim:clone()
   end
-  local z = {speed=1, x=x+1, y=y, moving=false, thinking="Gruh?", anims=newAnims}
+  local z = {speed=1, x=x+1, y=y, moving=false, thinking="Gruh?", anims=newAnims, hidden=hidden}
   z.anim = newAnims['stand']
   return z
 end
@@ -427,8 +433,13 @@ function updateZombies()
         bestCandidate.y = brain.y
       end
     end
+    -- Now we have the nearest target
 
-    if (not zom.locked) and (bestCandidate.dist < 0.8) then -- should be 1, but give some near miss
+    if (zom.hidden) then
+      if (bestCandidate.dist < 4.4) then
+        raiseTheUndead(zom)
+      end
+    elseif (not zom.locked) and (bestCandidate.dist < 0.8) then -- should be 1, but give some near miss
       local chain = findInChain(player, bestCandidate.char)
       if (bestCandidate.char == player) then chain = player end
       if chain then
@@ -436,13 +447,18 @@ function updateZombies()
       end
       feedZombie(zom, bestCandidate.char)  -- flip the animation, flux triggers back to normal
       removeSurvivor(bestCandidate.char)
-    end
-
-    if (not zom.moving) and (not zom.locked) then
+    elseif (not zom.moving) and (not zom.locked) then
       local dx, dy = nearestPassable(zom, bestCandidate)
       startMove(zom, 1/zom.speed, dx, dy)
     end
   end
+end
+
+function raiseTheUndead(zombie)
+  zombie.locked = true
+  zombie.hidden = false
+  zombie.anim = zombie.anims['raise']
+  zombie.flux = flux.to(zombie, 1, {x=zombie.x}):oncomplete(unlockZombie)
 end
 
 function loseLife()
@@ -496,6 +512,7 @@ function sleepZombie(zombie)
 end
 
 function unlockZombie(zombie)
+  zombie.anim = zombie.anims['stand']
   zombie.moving = false
   zombie.locked = false
 end

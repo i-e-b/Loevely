@@ -40,6 +40,13 @@ do
     return src
   end
 
+  -- rewind and play the source.
+  -- useful for quickly repeated blips
+  function love.audio.replay(src)
+    love.audio.rewind(src)
+    play(src)
+  end
+
   function love.audio.loop(src, howMany, delay)
     play(src)
     delay = delay or 0

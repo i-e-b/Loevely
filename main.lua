@@ -30,6 +30,8 @@ function love.load()
   assets.munchSnd = love.audio.newSource("assets/munch.wav", "static")
   assets.pickupSnd = love.audio.newSource("assets/pickup.wav", "static")
   assets.shoveSnd = love.audio.newSource("assets/shove.wav", "static")
+  assets.saveSnd = love.audio.newSource("assets/save.wav", "static")
+  assets.walkSnd = love.audio.newSource("assets/walk.wav", "static")
 
   assets.creepSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
   assets.bigfont:setFilter("linear", "nearest")

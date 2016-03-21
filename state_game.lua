@@ -262,7 +262,7 @@ function makeZombie(x,y, hidden)
   for k,anim in pairs(protoZombie.anims) do
     newAnims[k] = anim:clone()
   end
-  local z = {speed=1, x=x+1, y=y, moving=false, thinking="Gruh?", anims=newAnims, hidden=hidden}
+  local z = {speed=1, x=x+1, y=y, moving=false, thinking="", anims=newAnims, hidden=hidden}
   z.anim = newAnims['stand']
   return z
 end
@@ -367,14 +367,7 @@ function updateSurvivors()
     local surv = survivors[i]
     local safe = inSafeHouse(surv)
     if safe then
-      scoreFlash(surv.score, surv.x, surv.y)
-      currentGame.Score = currentGame.Score + surv.score
-      table.remove(survivors, i)
-      currentGame.LevelSurvivorsRescued = currentGame.LevelSurvivorsRescued + 1
-      if (surv.followedBy) then
-        startMoveChain(safe)
-        safe.followedBy = surv.followedBy
-      end
+      survivorEscapes(surv, i, safe)
     elseif (surv.flee and surv.flee.dist < 2 and not surv.flux) then
       -- run away from zombies
       -- unless we're in a chain. We trust the player (fools...)
@@ -417,7 +410,7 @@ function updateZombies()
       --[[]] x = zom.x + math.random(-2, 2), -- wander at random, less biased
       y = zom.y + math.random(-2, 2)
     }
-    if (not zom.locked) then zom.thinking = "gruuh" end
+    if (not zom.locked) then zom.thinking = "" end
 
     for j, brain in ipairs(brains) do
       -- inject 'run away' direction into the target
@@ -609,6 +602,7 @@ function updateControl()
     end
     if (level.isPassable(currentLevel, player, dx, dy)) then
       player.moving = true
+      love.audio.replay(assets.walkSnd)
       startMove(player, 1/player.speed, dx, dy)
     else
       dx =  0; dy = 0
@@ -704,6 +698,18 @@ function lockAndScoreChain(head, score)
   head.wait = false
   head.score = score
   lockAndScoreChain(head.followedBy, score * 2)
+end
+
+function survivorEscapes(surv, index, safehouse)
+  love.audio.replay(assets.saveSnd)
+  scoreFlash(surv.score, surv.x, surv.y)
+  currentGame.Score = currentGame.Score + surv.score
+  table.remove(survivors, index)
+  currentGame.LevelSurvivorsRescued = currentGame.LevelSurvivorsRescued + 1
+  if (surv.followedBy) then
+    startMoveChain(safehouse)
+    safehouse.followedBy = surv.followedBy
+  end
 end
 
 function survivorPickupDetect()

@@ -342,6 +342,8 @@ function shoveFlash(player, surv)
     anim = player.anims['shove']:clone()
   }
   flux.to(flash, 0.3, {alpha = flash.alpha}):oncomplete(removeFlash)
+
+  assets.shoveSnd:play()
   table.insert(flashes, flash)
 end
 
@@ -483,8 +485,11 @@ function feedZombie(zombie, eaten)
   eaten.x = near(eaten.x)
   eaten.y = near(eaten.y)
 
+  love.audio.loop(assets.munchSnd, 4, 0.8)
+
   if (player == eaten) then -- game over, man
     zombie.anim = zombie.anims['feedPlayer']
+    zombie.anim:gotoFrame(2)
 
     player.anim = player.anims['stand']
     player.visible = false
@@ -500,6 +505,7 @@ function feedZombie(zombie, eaten)
   else -- oops. Not a survivor anymore.
     currentGame.LevelSurvivorsEaten = currentGame.LevelSurvivorsEaten + 1
     zombie.anim = zombie.anims['feedSurvivor']
+    zombie.anim:gotoFrame(2)
   end
 
   zombie.flux = flux.to(zombie, FeedingDuration, {x = zombie.x}):oncomplete(sleepZombie)
@@ -709,16 +715,21 @@ function survivorPickupDetect()
       --  scatter this one and their followers
       local leader = findInChain(player, surv)
       if (leader == nil) then -- a lone survivor, join the queue
-        surv.followedBy = player.followedBy
-        player.followedBy = surv
-        surv.wait = true -- fix conga overlap
-        surv.thinking = ""
+        pickupSurvivor(surv)
       else -- we hit our conga line. everyone gets knocked off and set to panic
         shoveFlash(player, surv)
         bustChain(leader)
       end
     end
   end
+end
+
+function pickupSurvivor(surv)
+  assets.pickupSnd:play()
+  surv.followedBy = player.followedBy
+  player.followedBy = surv
+  surv.wait = true -- fix conga overlap
+  surv.thinking = ""
 end
 
 -- find the leader of the target if it's in the chain

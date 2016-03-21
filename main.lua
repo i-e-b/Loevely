@@ -1,3 +1,4 @@
+require "miniSound"           -- audio manager
 local anim8 = require "anim8" -- character animations
 local flux = require "flux"   -- movement tweening. Modified from standard
 
@@ -25,10 +26,14 @@ function love.load()
   assets.bigfont = love.graphics.newImageFont("assets/bigfont.png", "!$'*+,-.0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ")
   assets.smallfont = love.graphics.newImageFont("assets/smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]\"")
 
+  -- static only for small short and repeated sounds
+  assets.munchSnd = love.audio.newSource("assets/munch.wav", "static")
+  assets.pickupSnd = love.audio.newSource("assets/pickup.wav", "static")
+  assets.shoveSnd = love.audio.newSource("assets/shove.wav", "static")
+
   assets.creepSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
   assets.bigfont:setFilter("linear", "nearest")
   assets.smallfont:setFilter("linear", "nearest")
-
 
   state_game.Initialise(assets)
   state_levelEnd.Initialise(assets)
@@ -41,6 +46,8 @@ end
 
 -- Update, with frame time in fractional seconds
 function love.update(dt)
+  love.audio.update(dt)
+
   if (GameState.LevelComplete) then
     if (GameState.LevelShouldAdvance) then
       state_game.AdvanceLevel(GameState)
@@ -60,6 +67,11 @@ function love.update(dt)
   CurrentGlobalState.Update(dt, keyDownCount)
 end
 
+-- Draw a frame
+function love.draw()
+  CurrentGlobalState.Draw()
+end
+
 function love.keypressed(key)
   if key == 'escape' then
     love.event.push('quit') -- Quit the game.
@@ -75,10 +87,4 @@ function love.keyreleased(key)
 end
 function love.mousereleased( x, y, button, istouch )
   keyDownCount = keyDownCount - 1
-end
-
-
--- Draw a frame
-function love.draw()
-  CurrentGlobalState.Draw()
 end

@@ -19,6 +19,8 @@ local FeedingDuration = 3 -- shorter is harder
 
 -- Position of touch buttons:
 local buttons = {up={230, 225}, down={230, 495}, left={100, 360}, right={370, 360}, action={1100,500}}
+local gamepad = nil
+local lastDx, lastDy --so we can bias the controls to make them feel nice
 -- currently loaded level data
 local currentLevel
 
@@ -219,7 +221,8 @@ function Draw()
   drawHUD()  -- FPS counter, score, survivor count - always last.
 end
 
-function Update(dt)
+function Update(dt, _, connectedPad)
+  gamepad = connectedPad
   if (table.getn(survivors) < 1) and not endLevelTransition then -- level complete
     endLevelTransition = true
     flux.to(gui, 2, {bloodTint = 0}):ease("linear"):oncomplete(levelComplete)
@@ -276,9 +279,9 @@ function makeSurvivor(x,y, name)
   s.anim = newAnims['help']
 
   s.color = {
-    r = love.math.random(120,255),
-    g = love.math.random(120,255),
-    b = love.math.random(120,255),
+    r = love.math.random(140,255),
+    g = love.math.random(70,220),
+    b = love.math.random(70,220),
   }
 
   return s
@@ -294,13 +297,25 @@ function updateAnimations(dt)
   player.anim:update(dt)
 end
 
-local input = {up=false, down=false, left=false, right=false, action=false}
+local input = {wasGamePad=false, up=false, down=false, left=false, right=false, action=false}
 function readInputs()
   input.up = love.keyboard.isDown("up")
   input.down = love.keyboard.isDown("down")
   input.left = love.keyboard.isDown("left")
   input.right = love.keyboard.isDown("right")
   input.action = love.keyboard.isDown("lctrl")
+
+  if (gamepad) then
+    -- currently hard-coded to my own game pad
+    -- TODO: config screen should be able to set this
+    local dx = gamepad:getAxis(1)
+    local dy = gamepad:getAxis(2)
+    if dx == 1 then input.right = true; input.wasGamePad = true end
+    if dx == -1 then input.left = true; input.wasGamePad = true end
+    if dy == 1 then input.down = true; input.wasGamePad = true end
+    if dy == -1 then input.up = true; input.wasGamePad = true end
+    if gamepad:isDown(1,2,3,4) then input.action = true end
+  end
 
   -- if press in a special area, that input goes true
   if love.mouse.isDown(1) then
@@ -574,16 +589,23 @@ end
 function updateControl()
   local dx = 0
   local dy = 0
-      if input.up    then dy = -1; dx = 0
-  elseif input.down  then dy =  1; dx = 0
-  elseif input.left  then dx = -1; dy = 0
-  elseif input.right then dx =  1; dy = 0 end
+  if input.up    then dy = -1; end
+  if input.down  then dy =  1; end
+  if input.left  then dx = -1; end
+  if input.right then dx =  1; end
 
-  --[[if input.action and currentLevel.zoom < 20 then
-    currentLevel.zoom = currentLevel.zoom + 0.1
+  if (lastDx == 0 and lastDy == 0) then lastDx = 1 end
+
+  -- if we are using a pad-like control, we bias to continue the
+  -- current direction. If we are using keyboard controls, we
+  -- then bias to change direction. This suits each style best
+  if input.wasGamePad then
+    if (lastDx ~= 0 and dx ~= 0) then dy = 0 end
+    if (lastDy ~= 0 and dy ~= 0) then dx = 0 end
   else
-    currentLevel.zoom = 4
-  end]]
+    if (lastDy ~= 0 and dx ~= 0) then dy = 0 end
+    if (lastDx ~= 0 and dy ~= 0) then dx = 0 end
+  end
 
   if input.action and (not player.warping) then
     -- test for a warp. If so, follow it.
@@ -608,6 +630,9 @@ function updateControl()
       dx =  0; dy = 0
     end
   end
+
+  lastDx = dx
+  lastDy = dy
 end
 
 function near(a) return math.floor(a+0.5) end -- crap, but will do for map indexes
@@ -803,6 +828,26 @@ function drawHUD()
   love.graphics.print(currentGame.Lives, 84, screenHeight - 50, 0, 2)
 
   if (currentGame.Lives < 1) then centreBigString("GAME OVER", screenWidth/2,screenHeight/2,4) end
+
+  --[[ -- mapping details for my cheap snes pad
+  if (gamepad) then
+    if (gamepad:isGamepad()) then
+      love.graphics.print("Game pad connected", 84, screenHeight/2, 0, 2)
+    else
+      dir = gamepad:getAxis(1) -- left = -1, right = 1
+      dir = gamepad:getAxis(2) -- up = -1, down = 1
+      local descr = ""
+      if gamepad:isDown(10) then descr = "start" end
+      if gamepad:isDown(9) then descr = "select" end
+      if gamepad:isDown(4) then descr = "Y" end
+      if gamepad:isDown(3) then descr = "B" end
+      if gamepad:isDown(1) then descr = "X" end
+      if gamepad:isDown(2) then descr = "A" end
+      love.graphics.print(descr, 84, screenHeight/2, 0, 2)
+    end
+  else
+    love.graphics.print("no pad", 84, screenHeight/2, 0, 2)
+  end]]
 end
 
 function deepcopy(orig)

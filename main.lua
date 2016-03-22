@@ -6,11 +6,12 @@ local state_game = require "state_game"
 local state_levelEnd = require "state_levelEnd"
 local state_finalScreen = require "state_finalScreen"
 
-local levelNames = {"ztown.tmx", "hospital.tmx", "gauntlet.tmx", "theRing.tmx"}
+local levelNames = {"ztown.tmx", "hospital.tmx", "gauntlet.tmx", "ring.tmx"}
 
 local screenWidth, screenHeight
 
 local assets = {smallfont, bigfont, creepSheet} -- UI animations
+local currentJoystick = nil
 
 local CurrentGlobalState = nil
 local GameState = nil -- the current game. "New Game" resets, "Load" sets up
@@ -46,6 +47,17 @@ function love.load()
   CurrentGlobalState = state_game
 end
 
+-- connect joysticks and gamepads
+function love.joystickadded(joystick)
+  currentJoystick = joystick
+end
+
+function love.joystickremoved(joystick)
+  if (currentJoystick == joystick) then
+    currentJoystick = nil
+  end
+end
+
 -- Update, with frame time in fractional seconds
 function love.update(dt)
   love.audio.update(dt)
@@ -66,7 +78,7 @@ function love.update(dt)
     end
   end
 
-  CurrentGlobalState.Update(dt, keyDownCount)
+  CurrentGlobalState.Update(dt, keyDownCount, currentJoystick)
 end
 
 -- Draw a frame
@@ -75,7 +87,13 @@ function love.draw()
 end
 
 function love.keypressed(key)
-  if key == 'escape' then
+  if key == 'escape' then -- TODO: go to pause screen (also joystick)
+    love.event.push('quit') -- Quit the game.
+  end
+  keyDownCount = keyDownCount + 1
+end
+function love.joystickpressed(joystick,button)
+  if button == 10 then -- TODO: go to pause screen (also keyboard)
     love.event.push('quit') -- Quit the game.
   end
   keyDownCount = keyDownCount + 1
@@ -88,5 +106,8 @@ function love.keyreleased(key)
   keyDownCount = keyDownCount - 1
 end
 function love.mousereleased( x, y, button, istouch )
+  keyDownCount = keyDownCount - 1
+end
+function love.joystickreleased(joystick,button)
   keyDownCount = keyDownCount - 1
 end

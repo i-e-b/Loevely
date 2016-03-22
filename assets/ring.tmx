@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="49" height="49" tilewidth="16" tileheight="16">
+ <properties>
+  <property name="safe" value="33,26;"/>
+ </properties>
+ <tileset firstgid="1" name="ztown" tilewidth="16" tileheight="16">
+  <image source="ztown.png" width="256" height="295"/>
+ </tileset>
+ <layer name="bg" width="49" height="49">
+  <data encoding="base64" compression="zlib">
+   eJy9WklrVEEQ7phfoFFxOxgjKC6HxBWXiFFB8KoIQhB3QVBREPTgFlFHyIQo6ikXPUguUYiacTtF/5fVvFdMUVNVXf3eTA4fPfNev9f1da1dM30hhGUV0A/4rGA5YEUFDACmADNk9LyrznozCgYBmypgSNgP612rGYdVznXwuchhUsEwYE8FjGS+C2XHccC5Dp3fUFCHQ867JA6HAUcAo2wuvS5xmGO4ALhYAZcEDta7JA6XAVcAV9lcet2jh4j7SzBKHDT7pvBw6KZ8dC0+T+Jg7WuDPWfN7wt2TPbwoPFoSJmHc3rBwYrXA049UF8eUebhHFxvpbBX0p5udsiS4uDRw1HAiRJjCZ7SenSPNXksWay8pNlFlRFjlrTeEOGgyWPJYsV0zS7qjNJ6cZ1mCU0eS5YUh27HWY0D1j4WB48tc4wJz1hxzAMpD8Z8iflAy5OYUyUeqRyTE8c88MRTDZoecoEctgG2A3YwGXcKctNrvagBPDmu23rIka/Jxqr5gYLHvlwOXwzMhU47p6PGJ5cDjxu5evkDmC/xFfCbQZOfj3X0wOOYl8MawNpS9sVybIV2TJ0qUcUfUnmac9BqYy+Qw2LJAWVHHlQ+zVd5LRptYzwUdrEPcKD8HK9hbuToI++pY0t/Q6cteeyc13+Rw7nQmRf3GhwGiY5yewrzBppsf63aieshyhvPsGizowkOw+Qe1eN4qcv9pT7pZ7zHz8IcdH+j750Ohd+dLcczobM2vgm4BbgdijNsxEPAI8BjJvtTwEfALsBuwATbg3iOPyRwOEjupfzzOeAT4EViHh1zao1ngFmih2nAdcCNoJ/vr7F7KXleAjYC3jrlz603IoetoV0PTmeu4xnfAe4B3vdA/ojXoYiHd0q8qSBntMUPwhgxQdbqRV2FY6vm8w9CYY98jHhSUz7qS/G7VAdE/Mt4L8Y5en3WwHTifccAx4371Je6sd/aqMn/qgt6oL7UKDn0wh5ny73y6CG1792ye6xp+pdQD3RNax7Vg3VOwh4W73lZekBwfaT8Af2U9v6+OfWQW9dZ/ay6eohyYR0V66YFcp/HJaoH5EDPxdbvOFY/KycuSf7QKq+fLO9ROa24pPUXvb01aot18wPW6z9DO9Z74pLWX/T21uge3A1FjpfGnLzviZtUD1pvzttboxy8cTEV73jclHIyzccaB+s8o+nBE4el2JPSA3JqBvsMS/c61bOkclJbxDhs8eCx57uwxz/Y94XQ7tlYZ9icXkCcj79bxzMTntM98TdyiGe4LaGwSynfanqYDOkzLMLDAflKHDAnSvrA2PMr6HUm59UK7d4Txt6IU6E4Q54PbT9FpHoBkTOekSMHPI/yfmzKrrz+zjlZvTVE6rd52k+I/Xg8j+bmda+/e2vUqhyoH6Hc6wDrARuCbVcpf28FWQ8eHqn/F0j/I2gQDlLv32NX6O+Yh1rkutSLtfTg+Y3f4lClXqT+zvNYFT1UxX9o9oc3
+  </data>
+ </layer>
+ <layer name="fg" width="49" height="49">
+  <data encoding="base64" compression="zlib">
+   eJzt2c0NwjAMhmEfoOKnEiOwMhPAcHQBfgbASCBQVKFQObEJ7yN9lx4SX+K4rUgshyT4L/skaMdMM3+kc64FACCyy3yGcSvNWtN7F4JJ0pkzwgz6Pivl5JctNEvvIhp09i7AwMm7AEcR+1JLLGecjeFaY+498qgZCu6xLbj200VzrbAPbFjfzTnrlT5LNdQ4S99gxgJeppwH+hKAT/hvHQPvyPHx3RwQuQEn+xoI
+  </data>
+ </layer>
+ <layer name="placement" width="49" height="49">
+  <data encoding="base64" compression="zlib">
+   eJzt1zsOgDAIANB6/zP7iYOJ0UmTBlreGztBAy20VtwSHcAA3BGJbM8D9QkhXr04qSp5cuNfAX5YowO4eMOYWKq5LGOvZYypoz06AABgeKnmS9LrWS/Va7F6/kP6sn8W21XhdADuBwn2
+  </data>
+ </layer>
+</map>

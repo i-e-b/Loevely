@@ -56,19 +56,19 @@ function Draw()
   rightAlignString("Score", left, height, 2)
   love.graphics.print(math.ceil(currentGame.Score), right, height, 0, 2)
 
-  height = height + 100
+  height = height + 70
   rightAlignString("Time taken", left, height, 2)
-  love.graphics.print(math.ceil(currentGame.LevelTime) .. " seconds", right, height, 0, 2)
+  love.graphics.print(math.floor(currentGame.LevelTime) .. " seconds", right, height, 0, 2)
 
-  height = height + 100
+  height = height + 70
   rightAlignString("Survivors rescued", left, height, 2)
   love.graphics.print(currentGame.LevelSurvivorsRescued, right, height, 0, 2)
 
-  height = height + 100
+  height = height + 70
   rightAlignString("Survivors eaten", left, height, 2)
   love.graphics.print(currentGame.LevelSurvivorsEaten, right, height, 0, 2)
 
-  height = height + 100
+  height = height + 70
   rightAlignString("Zombies minced", left, height, 2)
   love.graphics.print(currentGame.LevelZombiesMinced, right, height, 0, 2)
 end

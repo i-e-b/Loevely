@@ -26,15 +26,16 @@ local currentLevel
 
 local mapOffset = {x = 1, y = 1} -- pixel offset for scrolling
 
-local flashes = {}     -- score animations, bump animations etc
+local flashes = {}     -- score animations, bump animations, tutorial text, etc
 -- flash must have an x and y (in tile coords) and can have 'text','alpha','anim'
--- animations are from taken from the 'creeps' sheet
+-- animations are from taken from the 'creeps' sheet.
+-- flashes are not automatically removed.
 
 local protoZombie = {anims={}}
 local protoSurvivor = {anims={}}
 local protoPlayer =
   { -- NPCs follow the same structure
-    speed=4, x=16, y=10,  -- tile grid coords
+    speed=4, x=2, y=2,  -- tile grid coords
     thinking="",          -- text above the character
     anims={},             -- animation sets against the 'creeps' image
     anim=nil,             -- current stance animation
@@ -119,13 +120,16 @@ function AdvanceLevel(gameState)
   gameState.LevelShouldAdvance = false
   gameState.Level = gameState.Level + 1
 
+  resetLevelCounters(gameState)
+  endLevelTransition = false
+  gui.bloodTint = 255
+end
+
+function resetLevelCounters(gameState)
   gameState.LevelTime = 0
   gameState.LevelSurvivorsEaten = 0
   gameState.LevelSurvivorsRescued = 0
   gameState.LevelZombiesMinced = 0
-
-  endLevelTransition = false
-  gui.bloodTint = 255
 end
 
 -- Load a gameState and level ready for play.
@@ -151,9 +155,15 @@ function LoadState(levelName, gameState)
       table.insert(zombies, makeZombie(creep.x, creep.y, false))
     elseif creep.type == 253 then -- hidden zombie
       table.insert(zombies, makeZombie(creep.x, creep.y, true))
+    elseif creep.type == 252 then -- tutorial survivor, doen't need to be saved
+      table.insert(survivors, makeSurvivor(creep.x, creep.y, false))
     elseif creep.type == 256 then -- survivor
-      table.insert(survivors, makeSurvivor(creep.x, creep.y))
+      table.insert(survivors, makeSurvivor(creep.x, creep.y, true))
     end
+  end
+
+  for _,flash in pairs(currentLevel.infoFlash) do
+    table.insert(flashes, flash)
   end
 end
 
@@ -210,7 +220,7 @@ function Draw()
   for i, flash in ipairs(flashes) do
     love.graphics.setColor(255, 255, 255, (flash.alpha or 255))
     if (flash.text) then
-      love.graphics.print(flash.text, sceneX + zts * flash.x, sceneY + zts * flash.y, 0, zoom / 2)
+      centreSmallString(flash.text, sceneX + zts * (flash.x+0.5), sceneY + zts * flash.y, zoom / 2)
     end
     if (flash.anim) then
       flash.anim:draw(assets.creepSheet, sceneX + zts * flash.x, sceneY + zts * flash.y, 0, zoom)
@@ -223,7 +233,7 @@ end
 
 function Update(dt, _, connectedPad)
   gamepad = connectedPad
-  if (table.getn(survivors) < 1) and not endLevelTransition then -- level complete
+  if (noSurvivorsLeft()) and not endLevelTransition then -- level complete
     endLevelTransition = true
     flux.to(gui, 2, {bloodTint = 0}):ease("linear"):oncomplete(levelComplete)
   end
@@ -234,7 +244,7 @@ function Update(dt, _, connectedPad)
     return
   end
 
-  if (dt < 0.5) then -- don't count when paused or background
+  if (dt < 0.5) and (not endLevelTransition) then -- don't count when paused or background
     currentGame.LevelTime = currentGame.LevelTime + dt -- drift, here we come!
   end
 
@@ -256,10 +266,6 @@ function Update(dt, _, connectedPad)
   level.moveMap(currentLevel, targetX, targetY, mapOffset)
 end
 
-function levelComplete()
-  currentGame.LevelComplete = true
-end
-
 function makeZombie(x,y, hidden)
   local newAnims = {}
   for k,anim in pairs(protoZombie.anims) do
@@ -270,12 +276,12 @@ function makeZombie(x,y, hidden)
   return z
 end
 
-function makeSurvivor(x,y, name)
+function makeSurvivor(x,y, needsSaving)
   local newAnims = {}
   for k,anim in pairs(protoSurvivor.anims) do
     newAnims[k] = anim:clone()
   end
-  local s = {speed=4, score=100, x=x+1, y=y, thinking="Help!", anims=newAnims, panic = 0}
+  local s = {speed=4, score=100, x=x+1, y=y, thinking="Help!", anims=newAnims, panic = 0, needsSaving=needsSaving}
   s.anim = newAnims['help']
 
   s.color = {
@@ -295,6 +301,29 @@ function updateAnimations(dt)
   for i,flash in ipairs(flashes)  do if (flash.anim) then flash.anim:update(dt) end end
 
   player.anim:update(dt)
+end
+
+function noSurvivorsLeft()
+  if (not currentLevel.isTutorial) and (table.getn(survivors) < 1) then
+    return true
+  elseif (not currentLevel.isTutorial) then
+    return false
+  else
+    for _,surv in ipairs(survivors) do
+      if (surv.needsSaving) then return false end
+    end
+    return true
+  end
+end
+
+function levelComplete()
+  currentGame.LevelComplete = true
+  if (currentLevel.isTutorial) then
+    currentGame.LevelShouldAdvance = true -- no end screen
+    resetLevelCounters(currentGame) -- score and time don't count
+    currentGame.Score = 0
+    currentGame.Lives = 5
+  end
 end
 
 local input = {wasGamePad=false, up=false, down=false, left=false, right=false, action=false}
@@ -380,6 +409,14 @@ end
 function updateSurvivors()
   for i = #survivors, 1, -1 do
     local surv = survivors[i]
+
+    -- quick check to remove overlaps
+    if (surv.followedBy) then
+      if (surv.x == surv.followedBy.x) and (surv.y == surv.followedBy.y) then
+        surv.followedBy.waiting = true
+      end
+    end
+
     local safe = inSafeHouse(surv)
     if safe then
       survivorEscapes(surv, i, safe)

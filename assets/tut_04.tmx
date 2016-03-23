@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="17" height="9" tilewidth="16" tileheight="16">
+ <properties>
+  <property name="info" value="7,0,You can use secret tunnels to move around.\nTry pressing `action' when standing on these road holes.\nSurvivors won't follow you!;"/>
+  <property name="safe" value="13,2"/>
+  <property name="tutorial" value="true"/>
+  <property name="warp" value="2,4:5,6;6,6:9,4;"/>
+ </properties>
+ <tileset firstgid="1" name="ztown" tilewidth="16" tileheight="16">
+  <image source="ztown.png" width="256" height="295"/>
+ </tileset>
+ <layer name="bg" width="17" height="9">
+  <data encoding="base64" compression="zlib">
+   eJx7wMDA8GAQ4FoysDoVzKjFYUY3HvXY5GjlDmSsAcSaFJg/UBgAw7JbnQ==
+  </data>
+ </layer>
+ <layer name="placement" width="17" height="9">
+  <data encoding="base64" compression="zlib">
+   eJxjYBikgBFC/Ufjj4KhBwDINQEC
+  </data>
+ </layer>
+ <layer name="fg" width="17" height="9">
+  <data encoding="base64" compression="zlib">
+   eJxjYBgYwA7Ej4H4CYXmfAbiL5Q7h+aAA4g5B9oRAwQAm74Dxw==
+  </data>
+ </layer>
+</map>

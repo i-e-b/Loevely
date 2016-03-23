@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="17" height="32" tilewidth="16" tileheight="16">
+ <properties>
+  <property name="info" value="2,0,Here is a Zombie. They are hungry\nbut slow and unintelligent;2,6,Zombies will follow the nearest brain to feed on.;5,3,&gt;;14,0,As you move further away, the\nzombie will return to wandering.\nThey will follow the nearest\nliving creature that is close\nenough to be sensed;6,11,Survivors will flee\nfrom nearby Zombies,\nunless they are\nfollowing you.;14,18,Use your superior speed\nand skill to lead this\nsurvivor past the zombie ahead."/>
+  <property name="safe" value="14,20"/>
+  <property name="tutorial" value="true"/>
+ </properties>
+ <tileset firstgid="1" name="ztown" tilewidth="16" tileheight="16">
+  <image source="ztown.png" width="256" height="295"/>
+ </tileset>
+ <layer name="bg" width="17" height="32">
+  <data encoding="base64" compression="zlib">
+   eJx7wMDA8IBCLISGhckwQwkNK5NhxjosuBYHptTPo2bQzgxGIGZCw6SaIciAmS6Hsxm40jnMDEUGzDxGqhmGQGyKhkk1g1h/U5qekM0gN99T0wxCWJ0KZuBz42AxgxzzhoIZo5g8DACLMYWe
+  </data>
+ </layer>
+ <layer name="placement" width="17" height="32">
+  <data encoding="base64" compression="zlib">
+   eJxjYKAe+EtFsygB/wfaAaNg0IE/A+0AKoJ/A+0AUgDjQDuAemBIhfsoGAVDAAAAX2oE9g==
+  </data>
+ </layer>
+ <layer name="fg" width="17" height="32">
+  <data encoding="base64" compression="zlib">
+   eJxjYBgFo2AUjIJRQC5gB+LHQPyEQnM+A/EXyp0zCkbBkAEAbx0Dtg==
+  </data>
+ </layer>
+</map>

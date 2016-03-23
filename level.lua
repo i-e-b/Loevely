@@ -14,7 +14,8 @@ function load(filename, screenWidth, screenHeight)
   if (xmlError ~= "ok") then error(xmlError) end
   local lvl = {
     bg={}, fg={}, shade={}, placement={},
-    tiles={}, passable={}, warps={}, safeHouses={}
+    tiles={}, passable={}, warps={}, safeHouses={},
+    infoFlash={}, isTutorial=false
   }
 
   for i,xmlNode in pairs(xmlTest.ChildNodes) do
@@ -29,7 +30,8 @@ function load(filename, screenWidth, screenHeight)
     elseif (xmlNode.Name == "properties") then  -- read warp zones
       readWarps(lvl, xmlNode)
       readSafehouses(lvl, xmlNode)
-
+      readInfoFlash(lvl, xmlNode)
+      readTutorialFlag(lvl, xmlNode)
     elseif (xmlNode.Name == "layer") then  -- decode tile data into a map table
       local data
 
@@ -211,7 +213,7 @@ function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWi
 
   -- hard coded passability. Todo: find a *nice* way to do this from the map file
   for i,n in ipairs({18,20,36,39,40,41,64,101}) do level.passable[n] = true end
-  for i,n in ipairs({110,111,112,126,127,128,158,159,206,207,222,223}) do
+  for i,n in ipairs({110,111,112,126,127,128,158,159,206,207,222,223,224}) do
     level.passable[n] = false end
 
   level.fgBatch = {}
@@ -257,6 +259,25 @@ function readSafehouses(level, xmlNode)
       for x1,y1 in string.gmatch(spec, "(%w+),(%w+)") do
         table.insert(level.safeHouses, {x=x1+1,y=y1, followedBy={}, speed=4 })
       end
+    end
+  end
+end
+
+function readInfoFlash(level, xmlNode)
+  for i,subXmlNode in pairs(xmlNode.ChildNodes) do
+    if (subXmlNode.Attributes.name == "info") then
+      local spec = subXmlNode.Attributes.value
+      for x1,y1,text in string.gmatch(spec, "(%d+),(%d+),([^;]+)") do
+        table.insert(level.infoFlash, {x=x1+1,y=0+y1, text=text:gsub("\\n","\n") })
+      end
+    end
+  end
+end
+
+function readTutorialFlag(level, xmlNode)
+  for i,subXmlNode in pairs(xmlNode.ChildNodes) do
+    if (subXmlNode.Attributes.name == "tutorial") then
+      level.isTutorial = true
     end
   end
 end

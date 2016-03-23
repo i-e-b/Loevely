@@ -6,7 +6,10 @@ local state_game = require "state_game"
 local state_levelEnd = require "state_levelEnd"
 local state_finalScreen = require "state_finalScreen"
 
-local levelNames = {"ztown.tmx", "hospital.tmx", "gauntlet.tmx", "ring.tmx"}
+local levelNames = {
+  "tut_01.tmx", "tut_02.tmx", "tut_03.tmx", "tut_04.tmx",
+  "ztown.tmx", "hospital.tmx", "gauntlet.tmx", "ring.tmx"
+}
 
 local screenWidth, screenHeight
 
@@ -25,7 +28,7 @@ function love.load()
 
   assets.creepSheet = love.graphics.newImage("assets/creeps.png")
   assets.bigfont = love.graphics.newImageFont("assets/bigfont.png", "!$'*+,-.0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-  assets.smallfont = love.graphics.newImageFont("assets/smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]\"")
+  assets.smallfont = love.graphics.newImageFont("assets/smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]>")
 
   -- static only for small short and repeated sounds
   assets.munchSnd = love.audio.newSource("assets/munch.wav", "static")

@@ -5,6 +5,7 @@ local flux = require "flux"   -- movement tweening. Modified from standard
 local state_game = require "state_game"
 local state_levelEnd = require "state_levelEnd"
 local state_finalScreen = require "state_finalScreen"
+local state_pause = require "state_pause"
 
 local levelNames = {
   "tut_01.tmx", "tut_02.tmx", "tut_03.tmx", "tut_04.tmx",
@@ -25,9 +26,8 @@ local keyDownCount = 0 -- helper for skip scenes
 function love.load()
   love.window.fullscreen = (love.system.getOS() == "Android")
 
-
   assets.creepSheet = love.graphics.newImage("assets/creeps.png")
-  assets.bigfont = love.graphics.newImageFont("assets/bigfont.png", "!$'*+,-.0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+  assets.bigfont = love.graphics.newImageFont("assets/bigfont.png", "!$#*+,-.0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ")
   assets.smallfont = love.graphics.newImageFont("assets/smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]>")
 
   -- static only for small short and repeated sounds
@@ -44,11 +44,18 @@ function love.load()
   state_game.Initialise(assets)
   state_levelEnd.Initialise(assets)
   state_finalScreen.Initialise(assets)
+  state_pause.Initialise(assets)
+
+  love.handlers['gameResume'] = resumeGame
 
   GameState = state_game.CreateNewGameState()
   state_game.LoadState(levelNames[GameState.Level], GameState)
 
   CurrentGlobalState = state_game -- TODO: title screen
+end
+
+function resumeGame ()
+  CurrentGlobalState = state_game
 end
 
 -- connect joysticks and gamepads
@@ -91,14 +98,14 @@ function love.draw()
 end
 
 function love.keypressed(key)
-  if key == 'escape' then -- TODO: go to pause screen (also joystick)
-    love.event.push('quit') -- Quit the game.
+  if key == 'escape' then -- go to pause screen (also joystick)
+    CurrentGlobalState = state_pause
   end
   keyDownCount = keyDownCount + 1
 end
 function love.joystickpressed(joystick,button)
-  if button == 10 then -- TODO: go to pause screen (also keyboard)
-    love.event.push('quit') -- Quit the game.
+  if button == 10 then -- go to pause screen (also keyboard)
+    CurrentGlobalState = state_pause
   end
   keyDownCount = keyDownCount + 1
 end

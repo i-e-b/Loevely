@@ -51,21 +51,24 @@ function Draw()
   love.graphics.setFont(assets.smallfont)
   love.graphics.setColor(170, 170, 170, 255)
   centreSmallString(continueMessage, screenWidth / 2, 120, 2)
-
-
   love.graphics.setColor(255, 255, 255, 255)
+
+  rightAlignString("Score", left, height, 2)
+  love.graphics.print(math.ceil(currentGame.Score), right, height, 0, 2)
+
+  height = height + 100
   rightAlignString("Time taken", left, height, 2)
   love.graphics.print(math.ceil(currentGame.LevelTime) .. " seconds", right, height, 0, 2)
 
-  height = height + 120
+  height = height + 100
   rightAlignString("Survivors rescued", left, height, 2)
   love.graphics.print(currentGame.LevelSurvivorsRescued, right, height, 0, 2)
 
-  height = height + 120
+  height = height + 100
   rightAlignString("Survivors eaten", left, height, 2)
   love.graphics.print(currentGame.LevelSurvivorsEaten, right, height, 0, 2)
 
-  height = height + 120
+  height = height + 100
   rightAlignString("Zombies minced", left, height, 2)
   love.graphics.print(currentGame.LevelZombiesMinced, right, height, 0, 2)
 end

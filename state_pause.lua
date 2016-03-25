@@ -62,9 +62,11 @@ Update = function(dt, keyDownCount, gamepad)
   end
 end
 
--- A simple top half = exit, bottom half is resume
+-- A simple top half = exit, bottom half is resume; then box in a bit
 triggerClick = function(x,y)
-  if (y < (screenHeight / 2)) then
+  if (math.abs(x - (screenWidth / 2)) > 300) then return end
+  if (math.abs(y - (screenHeight / 2)) > 200) then return end
+  if (y + 30 < (screenHeight / 2)) then
     love.event.push('gameExit') -- the handlers are defined in main.lua
   else
     love.event.push('gameResume')

@@ -7,7 +7,7 @@ local level = require "level" -- loading levels from .tmx files
 local util = require "util"
 
 -- todo: read this from settings file
-local ShowTouchControls = love.system.getOS() == "Android"
+local isPhone = love.system.getOS() == "Android" or love.system.getOS() == "iOS"
 local screenWidth, screenHeight, playerCentreX, playerCentreY
 local currentGame -- assumes one loaded at once!
 local endLevelTransition -- doing an end of level animation
@@ -367,7 +367,7 @@ readInputs = function()
   input.right = love.keyboard.isDown("right")
   input.action = love.keyboard.isDown("lctrl")
 
-  if (gamepad) then
+  if (gamepad) and (not isPhone) then -- accelerometer counts as a joystick, so turn off until that is configurable
     -- currently hard-coded to my own game pad
     -- TODO: config screen should be able to set this
     local dx = gamepad:getAxis(1)
@@ -911,7 +911,7 @@ end]]
 end
 
 drawControlHints = function()
-  if not ShowTouchControls then return end
+  if not isPhone then return end
   for itr = 0, 2 do
     love.graphics.setColor(itr*70, itr*70, itr*70, 200)
     -- directions

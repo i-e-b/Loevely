@@ -6,14 +6,16 @@
 local flux = require "flux"
 
 local assets -- local copy of game-wide assets
-local screenWidth, screenHeight
+local screenWidth, screenHeight, currentGame
 
-function Initialise(coreAssets)
+local Initialise,Update,LoadState,Draw,rightAlignString,centreString
+
+Initialise = function(coreAssets)
   assets = coreAssets
   screenWidth, screenHeight = love.graphics.getDimensions( )
 end
 
-function Update(dt, keyDownCount)
+Update = function(dt, keyDownCount)
   flux.update(dt)
 
   if (keyDownCount > 0) then
@@ -23,11 +25,11 @@ function Update(dt, keyDownCount)
   love.graphics.setColor(255, 255, 255, 255)
 end
 
-function LoadState(gameState)
+LoadState = function(gameState)
   currentGame = gameState
 end
 
-function Draw()
+Draw = function()
   love.graphics.setFont(assets.bigfont)
   centreString("* GAME COMPLETE *", screenWidth / 2, 70, 2)
 
@@ -37,29 +39,35 @@ function Draw()
   local right = left + 48
 
   love.graphics.setFont(assets.smallfont)
-  rightAlignString("Time taken", left, height, 2)
-  love.graphics.print(math.ceil(currentGame.TotalTime) .. " seconds", right, height, 0, 2)
+  love.graphics.setColor(255, 255, 255, 255)
 
-  height = height + 120
+  rightAlignString("Score", left, height, 2)
+  love.graphics.print(math.ceil(currentGame.Score), right, height, 0, 2)
+
+  height = height + 70
+  rightAlignString("Time taken", left, height, 2)
+  love.graphics.print(math.floor(currentGame.TotalTime) .. " seconds", right, height, 0, 2)
+
+  height = height + 70
   rightAlignString("Survivors rescued", left, height, 2)
   love.graphics.print(currentGame.TotalSurvivorsRescued, right, height, 0, 2)
 
-  height = height + 120
+  height = height + 70
   rightAlignString("Survivors eaten", left, height, 2)
   love.graphics.print(currentGame.TotalSurvivorsEaten, right, height, 0, 2)
 
-  height = height + 120
+  height = height + 70
   rightAlignString("Zombies minced", left, height, 2)
   love.graphics.print(currentGame.TotalZombiesMinced, right, height, 0, 2)
 end
 
 -- todo> move these out to a common module?
-function rightAlignString(str, x, y, scale)
+rightAlignString = function(str, x, y, scale)
   scale = scale or 1
   local w = scale * assets.smallfont:getWidth(str)
   love.graphics.print(str, math.floor(x - w), math.floor(y), 0,scale)
 end
-function centreString(str, x, y, scale)
+centreString = function(str, x, y, scale)
   scale = scale or 1
   local w = scale * assets.bigfont:getWidth(str) / 2
   love.graphics.print(str, math.floor(x - w), math.floor(y - (scale * 13.5)), 0, scale)

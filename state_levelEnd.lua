@@ -11,7 +11,9 @@ local currentGame
 local readyForContinue
 local continueMessage
 
-function Initialise(coreAssets)
+local Initialise, Update, LoadState, Draw, rightAlignString, centreBigString, centreSmallString
+
+Initialise = function(coreAssets)
   if (love.system.getOS() == "Android") then
     continueMessage = "touch screen to continue"
   else
@@ -22,7 +24,7 @@ function Initialise(coreAssets)
   screenWidth, screenHeight = love.graphics.getDimensions( )
 end
 
-function Update(dt, keyDownCount)
+Update = function(dt, keyDownCount)
   flux.update(dt)
 
   if (readyForContinue) and (keyDownCount > 0) then
@@ -33,11 +35,11 @@ function Update(dt, keyDownCount)
   end
 end
 
-function LoadState(gameState)
+LoadState = function(gameState)
   currentGame = gameState
 end
 
-function Draw()
+Draw = function()
   love.graphics.setColor(255, 255, 255, 255)
 
   love.graphics.setFont(assets.bigfont)
@@ -74,17 +76,17 @@ function Draw()
 end
 
 -- todo> move these out to a common module?
-function rightAlignString(str, x, y, scale)
+rightAlignString = function(str, x, y, scale)
   scale = scale or 1
   local w = scale * assets.smallfont:getWidth(str)
   love.graphics.print(str, math.floor(x - w), math.floor(y), 0,scale)
 end
-function centreBigString(str, x, y, scale)
+centreBigString = function(str, x, y, scale)
   scale = scale or 1
   local w = scale * assets.bigfont:getWidth(str) / 2
   love.graphics.print(str, math.floor(x - w), math.floor(y - (scale * 13.5)), 0, scale)
 end
-function centreSmallString(str, x, y, scale)
+centreSmallString = function(str, x, y, scale)
   scale = scale or 1
   local w = scale * assets.smallfont:getWidth(str) / 2
   love.graphics.print(str, math.floor(x - w), math.floor(y), 0, scale)

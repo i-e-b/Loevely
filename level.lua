@@ -9,57 +9,12 @@ local b64 = require "b64"
 -- display with the objects and characters
 -- Shade is for overlay effects and is not hit detected or drawn in rows
 
-function load(filename, screenWidth, screenHeight)
-  local xmlTest, xmlError = xml:ParseXmlFile(filename)
-  if (xmlError ~= "ok") then error(xmlError) end
-  local lvl = {
-    bg={}, fg={}, shade={}, placement={},
-    tiles={}, passable={}, warps={}, safeHouses={},
-    infoFlash={}, isTutorial=false
-  }
+local drawBgRow, drawFgRow, moveMap, safePass, posToRow, isPassable,
+      tileIndex, listCreeps, setupMap, setupTileset, internalUpdateTilesetBatch,
+      updateTilesetBatch, readSafehouses, readInfoFlash, readTutorialFlag,
+      readWarps, wappend, load
 
-  for i,xmlNode in pairs(xmlTest.ChildNodes) do
-    if (xmlNode.Name == "tileset") then  -- read in image name, load the image
-      setupTileset(lvl,
-        xmlNode.ChildNodes[1].Attributes.source,
-        xmlTest.Attributes.tilewidth,
-        xmlTest.Attributes.width, xmlTest.Attributes.height,
-        screenWidth, screenHeight
-      )
-
-    elseif (xmlNode.Name == "properties") then  -- read warp zones
-      readWarps(lvl, xmlNode)
-      readSafehouses(lvl, xmlNode)
-      readInfoFlash(lvl, xmlNode)
-      readTutorialFlag(lvl, xmlNode)
-    elseif (xmlNode.Name == "layer") then  -- decode tile data into a map table
-      local data
-
-      for i,subXmlNode in pairs(xmlNode.ChildNodes) do
-        if (subXmlNode.Name == "data" and subXmlNode.Value) then -- it's a tile array
-          if (subXmlNode.Attributes.encoding ~= "base64" or subXmlNode.Attributes.compression ~= "zlib") then
-            error("Layer format must be base64 and zlib compressed")
-          end
-          data = love.math.decompress(b64.decode(subXmlNode.Value), "zlib" )
-        end
-      end
-
-      if xmlNode.Attributes.name == "bg" then
-        setupMap(lvl, lvl.bg, data)
-      elseif xmlNode.Attributes.name == "fg" then
-        setupMap(lvl, lvl.fg, data)
-      elseif xmlNode.Attributes.name == "placement" then
-        listCreeps(lvl, lvl.placement, data)
-      end
-
-    end
-  end
-
-  updateTilesetBatch(lvl)
-  return lvl
-end
-
-function drawBgRow(row, level, offsets, bloodTint)
+drawBgRow = function(row, level, offsets, bloodTint)
   bloodTint = bloodTint or 255
   love.graphics.setColor(255, bloodTint, bloodTint, 255)
   love.graphics.draw(level.bgBatch[row],
@@ -68,7 +23,7 @@ function drawBgRow(row, level, offsets, bloodTint)
       0, level.zoom, level.zoom)
 end
 
-function drawFgRow(row, level, offsets, bloodTint)
+drawFgRow = function(row, level, offsets, bloodTint)
   if not level.fgBatch[row] then return end
   bloodTint = bloodTint or 255
   love.graphics.setColor(255, bloodTint, bloodTint, 255)
@@ -81,7 +36,7 @@ end
 -- central function for moving the map by whole tiles
 -- input the map-wide coords in 'offsets', this gets updated as tiles
 -- get swapped in and out
-function moveMap(level, targetX, targetY, offsets)
+moveMap = function(level, targetX, targetY, offsets)
   local oldMapX = level.mapX
   local oldMapY = level.mapY
 
@@ -106,12 +61,18 @@ function moveMap(level, targetX, targetY, offsets)
   end
 end
 
+safePass = function(p, m, x, y)
+  if (not m[x]) then return false end
+  if (not m[x][y]) then return false end
+  return p[m[x][y]]
+end
+
 -- given map tile coords, return the draw row it's on (can be off-screen)
-function posToRow(pos, level)
+posToRow = function(pos, level)
   return (math.ceil(pos.y) - level.mapY) + 2
 end
 
-function isPassable(level, pos, dx, dy)
+isPassable = function(level, pos, dx, dy)
   local x = pos.x + dx
   local y = pos.y + dy + 1
 
@@ -130,13 +91,7 @@ function isPassable(level, pos, dx, dy)
   return false
 end
 
-function safePass(p, m, x, y)
-  if (not m[x]) then return false end
-  if (not m[x][y]) then return false end
-  return p[m[x][y]]
-end
-
-function tileIndex(raw, tileOffset)
+tileIndex = function(raw, tileOffset)
   local bz = (tileOffset * 4) + 1 -- 1 based indexing is weird
   local idx = string.byte(raw, bz)
   if idx == nil then return nil end
@@ -146,7 +101,7 @@ function tileIndex(raw, tileOffset)
   return idx
 end
 
-function listCreeps(level, creepList, byteData)
+listCreeps = function(level, creepList, byteData)
   if (not byteData) then return end
   local mapWidth = level.width
   local mapHeight = level.height
@@ -162,7 +117,7 @@ function listCreeps(level, creepList, byteData)
   end
 end
 
-function setupMap(level, map, byteData)
+setupMap = function(level, map, byteData)
   if (not byteData) then return end
   local mapWidth = level.width
   local mapHeight = level.height
@@ -175,7 +130,7 @@ function setupMap(level, map, byteData)
   end
 end
 
-function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWidth, screenHeight)
+setupTileset = function(level, imageName, tileSize, tilesWide, tilesTall, screenWidth, screenHeight)
   level.mapX = 1
   level.mapY = 1
   level.zoom = 4
@@ -228,12 +183,7 @@ function setupTileset(level, imageName, tileSize, tilesWide, tilesTall, screenWi
   end
 end
 
-function updateTilesetBatch(level)
-  internalUpdateTilesetBatch(level, level.bgBatch, level.bg)
-  internalUpdateTilesetBatch(level, level.fgBatch, level.fg)
-end
-
-function internalUpdateTilesetBatch(level, batch, map)
+internalUpdateTilesetBatch = function(level, batch, map)
   local mw = math.min(level.width,  level.tiles.DisplayWidth)
   local mh = math.min(level.height, level.tiles.DisplayHeight)
   local q,mx,my
@@ -256,7 +206,12 @@ function internalUpdateTilesetBatch(level, batch, map)
   end
 end
 
-function readSafehouses(level, xmlNode)
+updateTilesetBatch = function(level)
+  internalUpdateTilesetBatch(level, level.bgBatch, level.bg)
+  internalUpdateTilesetBatch(level, level.fgBatch, level.fg)
+end
+
+readSafehouses = function(level, xmlNode)
   for i,subXmlNode in pairs(xmlNode.ChildNodes) do
     if (subXmlNode.Attributes.name == "safe") then
       local spec = subXmlNode.Attributes.value
@@ -267,7 +222,7 @@ function readSafehouses(level, xmlNode)
   end
 end
 
-function readInfoFlash(level, xmlNode)
+readInfoFlash = function(level, xmlNode)
   for i,subXmlNode in pairs(xmlNode.ChildNodes) do
     if (subXmlNode.Attributes.name == "info") then
       local spec = subXmlNode.Attributes.value
@@ -278,7 +233,7 @@ function readInfoFlash(level, xmlNode)
   end
 end
 
-function readTutorialFlag(level, xmlNode)
+readTutorialFlag = function(level, xmlNode)
   for i,subXmlNode in pairs(xmlNode.ChildNodes) do
     if (subXmlNode.Attributes.name == "tutorial") then
       level.isTutorial = true
@@ -286,7 +241,7 @@ function readTutorialFlag(level, xmlNode)
   end
 end
 
-function readWarps(level, xmlNode)
+readWarps = function(level, xmlNode)
   for i,subXmlNode in pairs(xmlNode.ChildNodes) do
     if (subXmlNode.Attributes.name == "warp") then
       local spec = subXmlNode.Attributes.value
@@ -297,12 +252,62 @@ function readWarps(level, xmlNode)
     end
   end
 end
-function wappend(arry, x1,y1,x2,y2)
+wappend = function(arry, x1,y1,x2,y2)
   if not arry[x1+1] then arry[x1+1] = {} end
   arry[x1+1][0+y1] = {x=x2+1, y=0+y2}
 end
 
-local export = {
+load = function(filename, screenWidth, screenHeight)
+  local xmlTest, xmlError = xml:ParseXmlFile(filename)
+  if (xmlError ~= "ok") then error(xmlError) end
+  local lvl = {
+    bg={}, fg={}, shade={}, placement={},
+    tiles={}, passable={}, warps={}, safeHouses={},
+    infoFlash={}, isTutorial=false
+  }
+
+  for i,xmlNode in pairs(xmlTest.ChildNodes) do
+    if (xmlNode.Name == "tileset") then  -- read in image name, load the image
+      setupTileset(lvl,
+        xmlNode.ChildNodes[1].Attributes.source,
+        xmlTest.Attributes.tilewidth,
+        xmlTest.Attributes.width, xmlTest.Attributes.height,
+        screenWidth, screenHeight
+      )
+
+    elseif (xmlNode.Name == "properties") then  -- read warp zones
+      readWarps(lvl, xmlNode)
+      readSafehouses(lvl, xmlNode)
+      readInfoFlash(lvl, xmlNode)
+      readTutorialFlag(lvl, xmlNode)
+    elseif (xmlNode.Name == "layer") then  -- decode tile data into a map table
+      local data
+
+      for i,subXmlNode in pairs(xmlNode.ChildNodes) do
+        if (subXmlNode.Name == "data" and subXmlNode.Value) then -- it's a tile array
+          if (subXmlNode.Attributes.encoding ~= "base64" or subXmlNode.Attributes.compression ~= "zlib") then
+            error("Layer format must be base64 and zlib compressed")
+          end
+          data = love.math.decompress(b64.decode(subXmlNode.Value), "zlib" )
+        end
+      end
+
+      if xmlNode.Attributes.name == "bg" then
+        setupMap(lvl, lvl.bg, data)
+      elseif xmlNode.Attributes.name == "fg" then
+        setupMap(lvl, lvl.fg, data)
+      elseif xmlNode.Attributes.name == "placement" then
+        listCreeps(lvl, lvl.placement, data)
+      end
+
+    end
+  end
+
+  updateTilesetBatch(lvl)
+  return lvl
+end
+
+return {
   load = load,
   drawBgRow = drawBgRow,
   drawFgRow = drawFgRow,
@@ -310,4 +315,3 @@ local export = {
   isPassable = isPassable,
   posToRow = posToRow
 }
-return export

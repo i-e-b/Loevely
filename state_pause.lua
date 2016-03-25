@@ -4,17 +4,28 @@
 
 local assets -- local copy of game-wide assets
 local screenWidth, screenHeight
-local selected = 'exit'
+local selected = 'resume'
+local readyForInput = false
 
-function Initialise(coreAssets)
+local Initialise,Update,triggerClick,Draw,centreBigString, Reset
+
+Initialise = function(coreAssets)
   assets = coreAssets
   screenWidth, screenHeight = love.graphics.getDimensions()
 end
 
-function Update(dt, keyDownCount, gamepad)
-  -- TODO: scan keys, pad, mouse, touch. Either exit or resume
+Reset = function()
+  readyForInput = false
+end
+
+Update = function(dt, keyDownCount, gamepad)
+  if (keyDownCount < 1) then readyForInput = true end
+  if (not readyForInput) then return end
+  -- Scan keys, pad, mouse, touch. Either exit or resume
   -- This should probably fire off an event to kick the main module
   -- to switch states
+
+  -- PAD AND KEYBOARD: these have a two stage select and activate
   if love.keyboard.isDown("up") then
     selected = 'exit'
   elseif love.keyboard.isDown("down") then
@@ -32,17 +43,35 @@ function Update(dt, keyDownCount, gamepad)
     if gamepad:isDown(1,2,3,4) then doAction = true end
   end
 
-
   if doAction then
     if selected == 'exit' then
-      love.event.push('quit') -- Quit the game.
+      love.event.push('gameExit') -- the handlers are defined in main.lua
     else
-      love.event.push('gameResume') -- kick up a resume event
+      love.event.push('gameResume')
     end
+  end
+
+  -- MOUSE AND TOUCH: these activate immediately
+  if love.mouse.isDown(1) then
+    triggerClick(love.mouse.getPosition())
+	end
+
+  local touches = love.touch.getTouches()
+  for i, id in ipairs(touches) do
+    triggerClick(love.touch.getPosition(id))
   end
 end
 
-function Draw()
+-- A simple top half = exit, bottom half is resume
+triggerClick = function(x,y)
+  if (y < (screenHeight / 2)) then
+    love.event.push('gameExit') -- the handlers are defined in main.lua
+  else
+    love.event.push('gameResume')
+  end
+end
+
+Draw = function()
   love.graphics.setColor(255, 255, 255, 255)
 
   love.graphics.setFont(assets.bigfont)
@@ -66,7 +95,7 @@ function Draw()
   love.graphics.print(resumeMsg, left, height, 0, 2)
 end
 
-function centreBigString(str, x, y, scale)
+centreBigString = function(str, x, y, scale)
   scale = scale or 1
   local w = scale * assets.bigfont:getWidth(str) / 2
   love.graphics.print(str, math.floor(x - w), math.floor(y - (scale * 13.5)), 0, scale)
@@ -76,5 +105,6 @@ end
 return {
   Initialise = Initialise,
   Draw = Draw,
-  Update = Update
+  Update = Update,
+  Reset = Reset
 }

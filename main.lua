@@ -47,6 +47,8 @@ function love.load()
   state_pause.Initialise(assets)
 
   love.handlers['gameResume'] = resumeGame
+  love.handlers['gamePause'] = pauseGame
+  love.handlers['gameExit'] = exitGame
 
   GameState = state_game.CreateNewGameState()
   state_game.LoadState(levelNames[GameState.Level], GameState)
@@ -56,6 +58,13 @@ end
 
 function resumeGame ()
   CurrentGlobalState = state_game
+end
+function pauseGame ()
+  state_pause.Reset()
+  CurrentGlobalState = state_pause
+end
+function exitGame ()
+  love.event.quit()
 end
 
 -- connect joysticks and gamepads
@@ -98,15 +107,11 @@ function love.draw()
 end
 
 function love.keypressed(key)
-  if key == 'escape' then -- go to pause screen (also joystick)
-    CurrentGlobalState = state_pause
-  end
+  if key == 'escape' then pauseGame() end
   keyDownCount = keyDownCount + 1
 end
 function love.joystickpressed(joystick,button)
-  if button == 10 then -- go to pause screen (also keyboard)
-    CurrentGlobalState = state_pause
-  end
+  if button == 10 then pauseGame() end
   keyDownCount = keyDownCount + 1
 end
 function love.mousepressed( x, y, button, istouch )

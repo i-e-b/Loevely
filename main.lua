@@ -2,6 +2,7 @@ require "miniSound"           -- audio manager
 local anim8 = require "anim8" -- character animations
 local flux = require "flux"   -- movement tweening. Modified from standard
 
+local state_titleScreen = require "state_titleScreen"
 local state_game = require "state_game"
 local state_levelEnd = require "state_levelEnd"
 local state_finalScreen = require "state_finalScreen"
@@ -42,6 +43,7 @@ function love.load()
   assets.bigfont:setFilter("linear", "nearest")
   assets.smallfont:setFilter("linear", "nearest")
 
+  state_titleScreen.Initialise(assets)
   state_game.Initialise(assets)
   state_levelEnd.Initialise(assets)
   state_finalScreen.Initialise(assets)
@@ -54,7 +56,7 @@ function love.load()
   GameState = state_game.CreateNewGameState()
   state_game.LoadState(levelNames[GameState.Level], GameState)
 
-  CurrentGlobalState = state_game -- TODO: title screen
+  CurrentGlobalState = state_titleScreen
 end
 
 function resumeGame ()

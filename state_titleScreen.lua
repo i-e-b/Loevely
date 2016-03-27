@@ -8,21 +8,61 @@ local assets -- local copy of game-wide assets
 local screenWidth, screenHeight
 local currentGame
 local readyForInput
+local selection = 1
 
-local Initialise, Update, LoadState, Draw,
+local Initialise, Update, LoadState, Draw, Reset,
 rightAlignString, centreBigString, centreSmallString
 
 Initialise = function(coreAssets)
   readyForInput = false
   assets = coreAssets
-  screenWidth, screenHeight = love.graphics.getDimensions( )
+  screenWidth, screenHeight = love.graphics.getDimensions()
+  Reset()
+end
+
+Reset = function()
+  selection = 1
 end
 
 Update = function(dt, keyDownCount)
-  -- TODO TEMP: for now, just continue to the game
-  if (keyDownCount > 0) then love.event.push('gameResume') end
-
   if keyDownCount < 1 then readyForInput = true end
+  if not readyForInput then return end
+  if keyDownCount > 0 then readyForInput = false end
+
+  local delta = 0
+  -- PAD AND KEYBOARD: these have a two stage select and activate
+  if love.keyboard.isDown("up") then delta = -1 end
+  if love.keyboard.isDown("down") then delta = 1 end
+
+  local doAction = love.keyboard.isDown("lctrl","return","space")
+
+  if (gamepad) then
+    -- currently hard-coded to my own game pad
+    -- TODO: config screen should be able to set this
+    local dy = gamepad:getAxis(2)
+    if dy == 1 then delta = 1 end
+    if dy == -1 then delta = -1 end
+    if gamepad:isDown(1,2,3,4) then doAction = true end
+  end
+
+
+  -- TODO: mouse and touch
+
+
+  selection = math.min(math.max(1, selection + delta), 5)
+  if doAction then
+    if (selection == 1) then
+      love.event.push('loadGame', nil)
+    elseif (selection == 2) then
+      -- TODO: load game from storage and set as current
+    elseif (selection == 3) then
+      love.event.push('startTutorial')
+    elseif (selection == 4) then
+      --love.event.push('runSetup')
+    elseif (selection == 5) then
+      love.event.quit()
+    end
+  end
   flux.update(dt)
 end
 
@@ -41,20 +81,17 @@ Draw = function()
   love.graphics.setColor(170, 170, 170, 255)
   centreSmallString("snake meets pacman with zombies", screenWidth / 2, 120, 2)
 
-  local height = 240
+  local height = 140
   local xpos = screenWidth / 2
   love.graphics.setColor(255, 255, 255, 255)
 
-  centreSmallString("> New Game  ", xpos, height, 2)
+  local strs = {" New Game ", " Load Game ", " Tutorial ", " Configure ", " Quit "}
+  strs[selection] = "[" .. strs[selection] .. "]"
 
-  height = height + 100
-  centreSmallString("  Load Game  ", xpos, height, 2)
-
-  height = height + 100
-  centreSmallString("  Tutorial  ", xpos, height, 2)
-
-  height = height + 100
-  centreSmallString("  Configure  ", xpos, height, 2)
+  for i=1,5 do
+    height = height + 90
+    centreSmallString(strs[i], xpos, height, 2)
+  end
 end
 
 centreBigString = function(str, x, y, scale)
@@ -73,5 +110,6 @@ return {
   Initialise = Initialise,
   Draw = Draw,
   Update = Update,
-  LoadState = LoadState
+  LoadState = LoadState,
+  Reset = Reset
 }

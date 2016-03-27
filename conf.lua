@@ -5,6 +5,8 @@ function love.conf(t)
   t.window.width = 1312
   t.window.height = 720
 
+  t.accelerometerjoystick = false
+
   t.window.title = "Survivor"
   t.window.borderless = true
   t.window.fullscreen = false

@@ -52,22 +52,39 @@ function love.load()
   love.handlers['gameResume'] = resumeGame
   love.handlers['gamePause'] = pauseGame
   love.handlers['gameExit'] = exitGame
-
-  GameState = state_game.CreateNewGameState()
-  state_game.LoadState(levelNames[GameState.Level], GameState)
+  love.handlers['loadGame'] = loadGameAndSetState
+  love.handlers['startTutorial'] = loadTutorial
 
   CurrentGlobalState = state_titleScreen
 end
 
+
+function loadTutorial ()
+  GameState = state_game.CreateNewGameState()
+  GameState.Level = 1
+  state_game.LoadState(levelNames[GameState.Level], GameState)
+  CurrentGlobalState = state_game
+end
+
+function loadGameAndSetState (game)
+  game = game or state_game.CreateNewGameState()
+  GameState = game
+  state_game.LoadState(levelNames[GameState.Level], GameState)
+  CurrentGlobalState = state_game
+end
+
 function resumeGame ()
+  if (GameState == nil) then return end
   CurrentGlobalState = state_game
 end
 function pauseGame ()
+  if (CurrentGlobalState ~= state_game) then return end
   state_pause.Reset()
   CurrentGlobalState = state_pause
 end
 function exitGame ()
-  love.event.quit()
+  state_titleScreen.Reset()
+  CurrentGlobalState = state_titleScreen
 end
 
 -- connect joysticks and gamepads
@@ -85,7 +102,7 @@ end
 function love.update(dt)
   love.audio.update(dt)
 
-  if (GameState.LevelComplete) then
+  if (GameState and GameState.LevelComplete) then
     if (GameState.LevelShouldAdvance) then
       state_game.AdvanceLevel(GameState)
       if (levelNames[GameState.Level]) then

@@ -251,7 +251,7 @@ CreateNewGameState = function()
   return {
     Score = 0,
     Lives = 5, -- when zero, it's game over
-    Level = 1,
+    Level = 5, -- by default, skip the tutorial levels
     LevelComplete = false,      -- end of level state
     LevelShouldAdvance = false, -- begin next level
     LevelTime = 0,
@@ -367,7 +367,7 @@ readInputs = function()
   input.right = love.keyboard.isDown("right")
   input.action = love.keyboard.isDown("lctrl")
 
-  if (gamepad) and (not isPhone) then -- accelerometer counts as a joystick, so turn off until that is configurable
+  if gamepad then
     -- currently hard-coded to my own game pad
     -- TODO: config screen should be able to set this
     local dx = gamepad:getAxis(1)

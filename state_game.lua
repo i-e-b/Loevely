@@ -290,8 +290,8 @@ AdvanceLevel = function(gameState)
   gameState.Level = gameState.Level + 1
 
   resetLevelCounters(gameState)
-endLevelTransition = false
-gui.bloodTint = 255
+  endLevelTransition = false
+  gui.bloodTint = 255
 end
 
 resetLevelCounters = function(gameState)
@@ -362,7 +362,7 @@ levelComplete = function()
 end
 
 inButton = function(x,y,b)
-  if (math.abs(x - b[1]) < 140 and math.abs(y - b[2]) < 140)
+  if (math.abs(x - b[1]) < 110 and math.abs(y - b[2]) < 110)
   then return true else return false end
 end
 triggerClick = function(x,y)
@@ -404,7 +404,9 @@ readInputs = function()
   end
 end
 
-near = function(a) return math.floor(a+0.5) end -- crap, but will do for map indexes
+near = function(a)
+  return math.floor(a+0.5)
+end -- crap, but will do for map indexes
 
 sameTile = function(chr1, chr2, c1dx, c1dy)
   local dx = c1dx or 0

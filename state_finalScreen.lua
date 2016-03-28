@@ -7,6 +7,7 @@ local flux = require "flux"
 
 local assets -- local copy of game-wide assets
 local screenWidth, screenHeight, currentGame
+local readyForContinue = false
 
 local Initialise,Update,LoadState,Draw,rightAlignString,centreString
 
@@ -18,8 +19,11 @@ end
 Update = function(dt, keyDownCount)
   flux.update(dt)
 
-  if (keyDownCount > 0) then
-    --currentGame.LevelShouldAdvance = true
+  if (readyForContinue) and (keyDownCount > 0) then
+    love.event.push('gameExit')
+  end
+  if (keyDownCount < 1) then
+    readyForContinue = true
   end
 
   love.graphics.setColor(255, 255, 255, 255)

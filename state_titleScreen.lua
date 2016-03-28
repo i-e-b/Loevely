@@ -10,7 +10,7 @@ local currentGame
 local readyForInput
 local selection = 1
 
-local Initialise, Update, LoadState, Draw, Reset,
+local Initialise, Update, LoadState, Draw, Reset, triggerClick, triggerAction,
 rightAlignString, centreBigString, centreSmallString
 
 Initialise = function(coreAssets)
@@ -46,24 +46,43 @@ Update = function(dt, keyDownCount)
   end
 
 
-  -- TODO: mouse and touch
+  -- MOUSE AND TOUCH: these activate immediately
+  if love.mouse.isDown(1) then
+    triggerClick(love.mouse.getPosition())
+	end
 
+  local touches = love.touch.getTouches()
+  for i, id in ipairs(touches) do
+    triggerClick(love.touch.getPosition(id))
+  end
 
   selection = math.min(math.max(1, selection + delta), 5)
   if doAction then
-    if (selection == 1) then
-      love.event.push('loadGame', nil)
-    elseif (selection == 2) then
-      -- TODO: load game from storage and set as current
-    elseif (selection == 3) then
-      love.event.push('startTutorial')
-    elseif (selection == 4) then
-      --love.event.push('runSetup')
-    elseif (selection == 5) then
-      love.event.quit()
-    end
+    triggerAction()
   end
   flux.update(dt)
+end
+
+triggerClick = function(x,y)
+  if (math.abs(x - (screenWidth / 2)) > 300) then return end
+  selection = math.floor((y - 230 + 30) / 90) + 1
+  if (selection < 1) then return end
+  if (selection > 5) then return end
+  triggerAction()
+end
+
+triggerAction = function ()
+  if (selection == 1) then
+    love.event.push('loadGame', nil)
+  elseif (selection == 2) then
+    -- TODO: load game from storage and set as current
+  elseif (selection == 3) then
+    love.event.push('startTutorial')
+  elseif (selection == 4) then
+    --love.event.push('runSetup')
+  elseif (selection == 5) then
+    love.event.quit()
+  end
 end
 
 LoadState = function(gameState)

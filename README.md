@@ -17,6 +17,7 @@ Basics
 * [x] Keyboard input
 * [x] Basic animation
 * [x] Sound
+* [ ] Music
 * [x] Tile background
 * [x] AI / interactions
 

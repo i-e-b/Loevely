@@ -15,6 +15,7 @@ Initialise = function(coreAssets)
 end
 
 Reset = function()
+  selected = 'resume'
   readyForInput = false
 end
 

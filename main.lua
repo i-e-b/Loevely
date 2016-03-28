@@ -38,6 +38,7 @@ function love.load()
   assets.shoveSnd = love.audio.newSource("assets/shove.wav")
   assets.saveSnd = love.audio.newSource("assets/save.wav")
   assets.walkSnd = love.audio.newSource("assets/walk.wav")
+  assets.coinSnd = love.audio.newSource("assets/coin.wav")
 
   assets.creepSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
   assets.bigfont:setFilter("linear", "nearest")
@@ -55,6 +56,7 @@ function love.load()
   love.handlers['loadGame'] = loadGameAndSetState
   love.handlers['startTutorial'] = loadTutorial
 
+  love.audio.mute()
   CurrentGlobalState = state_titleScreen
 end
 

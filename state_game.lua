@@ -15,6 +15,7 @@ local endLevelTransition -- doing an end of level animation
 local assets -- local copy of game-wide assets
 local zombies = {}
 local survivors = {}
+local coins = {}
 local gui = {anims={}, bloodTint = 255}
 local FeedingDuration = 3 -- shorter is harder
 
@@ -37,20 +38,19 @@ local flashes = {}     -- score animations, bump animations, tutorial text, etc
 
 local protoZombie = {anims={}}
 local protoSurvivor = {anims={}}
-local protoPlayer =
-{ -- NPCs follow the same structure
-speed=4, x=2, y=2,  -- tile grid coords
-thinking="",          -- text above the character
-anims={},             -- animation sets against the 'creeps' image
-anim=nil,             -- current stance animation
-moving = false,       -- is player moving between tiles?
-warping = false,      -- is player roving around the sewers?
-followedBy = nil,     -- next element in survivor chain
-visible = true        -- if false, char is not drawn (for warping and overlay animations)
---waiting = false       -- should skip the next follow turn (survivors)
---panic = 0             -- how many rounds of panic left (survivors)
---locked = false        -- character is locked into an animation, don't interact
---hidden = false        -- hidden, will only trigger if a player comes close (zombies)
+local protoPlayer = { -- NPCs follow the same structure
+  speed=4, x=2, y=2,  -- tile grid coords
+  thinking="",          -- text above the character
+  anims={},             -- animation sets against the 'creeps' image
+  anim=nil,             -- current stance animation
+  moving = false,       -- is player moving between tiles?
+  warping = false,      -- is player roving around the sewers?
+  followedBy = nil,     -- next element in survivor chain
+  visible = true        -- if false, char is not drawn (for warping and overlay animations)
+  --waiting = false       -- should skip the next follow turn (survivors)
+  --panic = 0             -- how many rounds of panic left (survivors)
+  --locked = false        -- character is locked into an animation, don't interact
+  --hidden = false        -- hidden, will only trigger if a player comes close (zombies)
 }
 local player = nil
 
@@ -58,7 +58,7 @@ local input = {wasGamePad=false, up=false, down=false, left=false, right=false, 
 
 --[[ Big list of functions to get around Lua global/local crap ]]
 --[[ Hopefully, I can find a better way around this later      ]]
-local Initialise, CreateNewGameState, AdvanceLevel, resetLevelCounters,
+local Draw, Initialise, CreateNewGameState, AdvanceLevel, resetLevelCounters,
       makeZombie, makeSurvivor, updateAnimations, noSurvivorsLeft,
       levelComplete, inButton, triggerClick, readInputs, near, sameTile,
       inSafeHouse, shoveFlash, scoreFlash, removeFlash, updateSurvivors,
@@ -68,7 +68,7 @@ local Initialise, CreateNewGameState, AdvanceLevel, resetLevelCounters,
       startWarp, endWarp, escapeSurvivors, lockAndScoreChain, survivorEscapes,
       survivorPickupDetect, pickupSurvivor, findInChain, bustChain, appendMap,
       centreSmallString, centreBigString, rightAlignSmallString, drawHUD,
-      drawControlHints;
+      drawControlHints, coinPickupDetect;
 
 -- Load a gameState and level ready for play.
 -- Start calling Draw() and Update() to run the level
@@ -78,6 +78,7 @@ LoadState = function(levelName, gameState)
   flashes = {}
   zombies = {}
   survivors = {}
+  coins = {}
   player = deepcopy(protoPlayer)
 
   currentGame = gameState
@@ -88,7 +89,7 @@ LoadState = function(levelName, gameState)
 
   for i,creep in ipairs(currentLevel.placement) do
     if creep.type == 255 then -- player
-      player.x = creep.x+1; player.y = creep.y
+      player.x = creep.x; player.y = creep.y
     elseif creep.type == 254 then -- zombie
       table.insert(zombies, makeZombie(creep.x, creep.y, false))
     elseif creep.type == 253 then -- hidden zombie
@@ -97,6 +98,8 @@ LoadState = function(levelName, gameState)
       table.insert(survivors, makeSurvivor(creep.x, creep.y, false))
     elseif creep.type == 256 then -- survivor
       table.insert(survivors, makeSurvivor(creep.x, creep.y, true))
+    elseif creep.type == 251 then -- coin
+      table.insert(coins, {anim=gui.anims['coin'], x=creep.x, y=creep.y})
     end
   end
 
@@ -105,7 +108,7 @@ LoadState = function(levelName, gameState)
   end
 end
 
-local function Draw()
+Draw = function()
   local zts = currentLevel.zoom * currentLevel.tiles.size
   playerCentreX = (screenWidth / 2) - (zts / 2)
   playerCentreY = (screenHeight / 2) - (zts / 2)
@@ -120,12 +123,18 @@ local function Draw()
   local charRows = {}
 
   if (currentGame.Lives > 0) then
-    for i,char in ipairs(zombies) do
+    -- TODO: only add visible chars to `charRows`
+    for _,char in ipairs(coins) do
+      if char then
+        appendMap(charRows, char, level.posToRow(char, currentLevel))
+      end
+    end
+    for _,char in ipairs(zombies) do
       if (not char.hidden) then
         appendMap(charRows, char, level.posToRow(char, currentLevel))
       end
     end
-    for i,char in ipairs(survivors) do
+    for _,char in ipairs(survivors) do
       appendMap(charRows, char, level.posToRow(char, currentLevel))
     end
     if (player.visible) then
@@ -144,8 +153,15 @@ local function Draw()
         else
           love.graphics.setColor(255, gui.bloodTint, gui.bloodTint, 255)
         end
-        centreSmallString(char.thinking, sceneX + ((char.x+0.5)*zts), sceneY + (char.y+0.4)*zts, zoom/2)
-        char.anim:draw(assets.creepSheet, sceneX + (char.x*zts), sceneY + ((char.y+0.8)*zts), 0, zoom)
+        if (char.thinking) then
+          centreSmallString(char.thinking,sceneX + (char.x+0.5)*zts,sceneY + (char.y+0.4)*zts,zoom/2)
+        end
+        char.anim:draw(
+          assets.creepSheet,
+          math.floor(sceneX + char.x*zts),
+          math.floor(sceneY + (char.y+0.8)*zts),
+          0, zoom
+        )
       end
     end
     level.drawFgRow(row, currentLevel, mapOffset, gui.bloodTint)
@@ -172,12 +188,11 @@ end
 Update = function(dt, _, connectedPad)
   gamepad = connectedPad
   if (noSurvivorsLeft()) and not endLevelTransition then -- level complete
-  endLevelTransition = true
-  flux.to(gui, 2, {bloodTint = 0}):ease("linear"):oncomplete(levelComplete)
-end
+    endLevelTransition = true
+    flux.to(gui, 2, {bloodTint = 0}):ease("linear"):oncomplete(levelComplete)
+  end
 
-updateAnimations(dt) -- always do this first or the animations can get glitchy
-
+  updateAnimations(dt) -- always do this first or the animations can get glitchy
   if (currentGame.Lives < 1) then
     return
   end
@@ -204,11 +219,9 @@ updateAnimations(dt) -- always do this first or the animations can get glitchy
   level.moveMap(currentLevel, targetX, targetY, mapOffset)
 end
 
-
 -- Load assets and do load-time stuff
 -- Call this before anything else
 Initialise = function(coreAssets)
-
   assets = coreAssets
   screenWidth, screenHeight = love.graphics.getDimensions( )
 
@@ -219,6 +232,7 @@ Initialise = function(coreAssets)
 
   gui.anims['life'] = anim8.newAnimation(grid('1-2',11), {4,0.4})
   gui.anims['remaining'] = anim8.newAnimation(grid('1-3',12), 1.4)
+  gui.anims['coin'] = anim8.newAnimation(grid(10,'6-8', 10,'8-6'), 0.1)
   protoPlayer.anims['shove'] = anim8.newAnimation(grid(9,'6-11'), 0.04, 'pauseAtEnd')
 
   protoZombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)
@@ -292,7 +306,7 @@ makeZombie = function(x,y, hidden)
   for k,anim in pairs(protoZombie.anims) do
     newAnims[k] = anim:clone()
   end
-  local z = {speed=1, x=x+1, y=y, moving=false, thinking="", anims=newAnims, hidden=hidden}
+  local z = {speed=1, x=x, y=y, moving=false, thinking="", anims=newAnims, hidden=hidden}
   z.anim = newAnims['stand']
   return z
 end
@@ -302,7 +316,7 @@ makeSurvivor = function(x,y, needsSaving)
   for k,anim in pairs(protoSurvivor.anims) do
     newAnims[k] = anim:clone()
   end
-  local s = {speed=4, score=100, x=x+1, y=y, thinking="Help!", anims=newAnims, panic = 0, needsSaving=needsSaving}
+  local s = {speed=4, score=100, x=x, y=y, thinking="Help!", anims=newAnims, panic = 0, needsSaving=needsSaving}
   s.anim = newAnims['help']
 
   s.color = {
@@ -392,273 +406,273 @@ end
 
 near = function(a) return math.floor(a+0.5) end -- crap, but will do for map indexes
 
-  sameTile = function(chr1, chr2, c1dx, c1dy)
-    local dx = c1dx or 0
-    local dy = c1dy or 0
-    return (near(chr1.x + dx) == near(chr2.x)) and (near(chr1.y + dy) == near(chr2.y))
-  end
+sameTile = function(chr1, chr2, c1dx, c1dy)
+  local dx = c1dx or 0
+  local dy = c1dy or 0
+  return (near(chr1.x + dx) == near(chr2.x)) and (near(chr1.y + dy) == near(chr2.y))
+end
 
-  inSafeHouse = function(chr)
-    for i,sh in ipairs(currentLevel.safeHouses) do
-      if sameTile(chr, sh) then -- unhook the chain
-        return sh
+inSafeHouse = function(chr)
+  for i,sh in ipairs(currentLevel.safeHouses) do
+    if sameTile(chr, sh) then -- unhook the chain
+      return sh
+    end
+  end
+  return nil
+end
+
+shoveFlash = function(player, surv)
+  local x = (player.x - surv.x) / 2 + surv.x
+  local y = (player.y - surv.y) / 2 + surv.y + 1
+  local flash = {
+    x = x, y = y,
+    alpha = 255,
+    anim = player.anims['shove']:clone()
+  }
+  flux.to(flash, 0.3, {alpha = flash.alpha}):oncomplete(removeFlash)
+
+  love.audio.play(assets.shoveSnd)
+  table.insert(flashes, flash)
+end
+
+scoreFlash = function(num, x, y)
+  local flash = {
+    x = x, y = y,
+    alpha = 255, text = "+"..num
+  }
+  flux.to(flash, 1, {y = y-1, alpha = 0}):oncomplete(removeFlash)
+  table.insert(flashes, flash)
+end
+
+removeFlash = function(flash)
+  for i,v in ipairs(flashes) do
+    if (v == flash) then table.remove(flashes, i); return end
+  end
+end
+
+updateSurvivors = function()
+  for i = #survivors, 1, -1 do
+    local surv = survivors[i]
+
+    -- quick check to remove overlaps
+    if (surv.followedBy) then
+      if (surv.x == surv.followedBy.x) and (surv.y == surv.followedBy.y) then
+        surv.followedBy.waiting = true
       end
     end
-    return nil
+
+    local safe = inSafeHouse(surv)
+    if safe then
+      survivorEscapes(surv, i, safe)
+    elseif (surv.flee and surv.flee.dist < 2 and not surv.flux) then
+      -- run away from zombies
+      -- unless we're in a chain. We trust the player (fools...)
+      if not findInChain(player, surv) then
+        local fx,fy = nearestPassable(surv, surv.flee)
+        startMove(surv, 1/surv.speed, fx,fy)
+      end
+    elseif (surv.panic > 0) and (not surv.moving) then -- run around in a mad panic
+      surv.thinking = "A"..(string.rep('a',surv.panic)).."!"
+
+      local dx=0
+      local dy=0
+      while (dx == 0) and (dy == 0) do
+        dx = love.math.random( 1, 3 ) - 2
+        dy = love.math.random( 1, 3 ) - 2
+      end
+      dx,dy = nearestPassable(surv, {x=surv.x+dx,y=surv.y+dy})
+      startMove(surv, 1/surv.speed, dx, dy)
+    end
+  end
+end
+
+updateZombies = function()
+  local brains = {}
+  if not player.locked then table.insert(brains, player) end
+  for i,brain in ipairs(survivors) do
+    if (not brain.locked) then -- safehouse chains can't be munched
+      brain.flee = nil -- reset flee distance
+      table.insert(brains, brain)
+    end
   end
 
-  shoveFlash = function(player, surv)
-    local x = (player.x - surv.x) / 2 + surv.x
-    local y = (player.y - surv.y) / 2 + surv.y + 1
-    local flash = {
-      x = x, y = y,
-      alpha = 255,
-      anim = player.anims['shove']:clone()
+  for i, zom in ipairs(zombies) do
+    -- Find the nearest brain within 5 moves, or wander aimlessly
+    -- we set an artificial best candidate to define the wander and trigger radius
+    local bestCandidate = {
+      dist=6,
+      --[[x = math.random(1, currentLevel.width), -- generally tend to the middle
+      y = math.random(1, currentLevel.height)]]
+      --[[]] x = zom.x + math.random(-2, 2), -- wander at random, less biased
+      y = zom.y + math.random(-2, 2)
     }
-    flux.to(flash, 0.3, {alpha = flash.alpha}):oncomplete(removeFlash)
+    if (not zom.locked) then zom.thinking = "" end
 
-    assets.shoveSnd:play()
-    table.insert(flashes, flash)
-  end
-
-  scoreFlash = function(num, x, y)
-    local flash = {
-      x = x, y = y,
-      alpha = 255, text = "+"..num
-    }
-    flux.to(flash, 1, {y = y-1, alpha = 0}):oncomplete(removeFlash)
-    table.insert(flashes, flash)
-  end
-
-  removeFlash = function(flash)
-    for i,v in ipairs(flashes) do
-      if (v == flash) then table.remove(flashes, i); return end
-    end
-  end
-
-  updateSurvivors = function()
-    for i = #survivors, 1, -1 do
-      local surv = survivors[i]
-
-      -- quick check to remove overlaps
-      if (surv.followedBy) then
-        if (surv.x == surv.followedBy.x) and (surv.y == surv.followedBy.y) then
-          surv.followedBy.waiting = true
-        end
+    for j, brain in ipairs(brains) do
+      -- inject 'run away' direction into the target
+      local dist = math.abs(zom.x - brain.x) + math.abs(zom.y - brain.y) -- no diagonals, so manhattan distance is fine
+      local dx, dy = pinCardinal(zom, brain) -- flee direction
+      if (not brain.flee) or (brain.flee.dist > dist) then -- always flee the nearest zombie!
+        brain.flee = {dist=dist, x=brain.x+dx, y=brain.y+dy}
       end
 
-      local safe = inSafeHouse(surv)
-      if safe then
-        survivorEscapes(surv, i, safe)
-      elseif (surv.flee and surv.flee.dist < 2 and not surv.flux) then
-        -- run away from zombies
-        -- unless we're in a chain. We trust the player (fools...)
-        if not findInChain(player, surv) then
-          local fx,fy = nearestPassable(surv, surv.flee)
-          startMove(surv, 1/surv.speed, fx,fy)
-        end
-      elseif (surv.panic > 0) and (not surv.moving) then -- run around in a mad panic
-        surv.thinking = "A"..(string.rep('a',surv.panic)).."!"
-
-        local dx=0
-        local dy=0
-        while (dx == 0) and (dy == 0) do
-          dx = love.math.random( 1, 3 ) - 2
-          dy = love.math.random( 1, 3 ) - 2
-        end
-        dx,dy = nearestPassable(surv, {x=surv.x+dx,y=surv.y+dy})
-        startMove(surv, 1/surv.speed, dx, dy)
+      if (dist < bestCandidate.dist) then
+        if (not zom.locked) then zom.thinking = "Brains" end
+        bestCandidate.dist = dist
+        bestCandidate.char = brain
+        bestCandidate.x = brain.x
+        bestCandidate.y = brain.y
       end
     end
-  end
+    -- Now we have the nearest target
 
-  updateZombies = function()
-    local brains = {}
-    if not player.locked then table.insert(brains, player) end
-    for i,brain in ipairs(survivors) do
-      if (not brain.locked) then -- safehouse chains can't be munched
-        brain.flee = nil -- reset flee distance
-        table.insert(brains, brain)
+    if (zom.hidden) then
+      if (bestCandidate.dist < 4.4) then
+        raiseTheUndead(zom)
       end
-    end
-
-    for i, zom in ipairs(zombies) do
-      -- Find the nearest brain within 5 moves, or wander aimlessly
-      -- we set an artificial best candidate to define the wander and trigger radius
-      local bestCandidate = {
-        dist=6,
-        --[[x = math.random(1, currentLevel.width), -- generally tend to the middle
-        y = math.random(1, currentLevel.height)]]
-        --[[]] x = zom.x + math.random(-2, 2), -- wander at random, less biased
-        y = zom.y + math.random(-2, 2)
-      }
-      if (not zom.locked) then zom.thinking = "" end
-
-      for j, brain in ipairs(brains) do
-        -- inject 'run away' direction into the target
-        local dist = math.abs(zom.x - brain.x) + math.abs(zom.y - brain.y) -- no diagonals, so manhattan distance is fine
-        local dx, dy = pinCardinal(zom, brain) -- flee direction
-        if (not brain.flee) or (brain.flee.dist > dist) then -- always flee the nearest zombie!
-          brain.flee = {dist=dist, x=brain.x+dx, y=brain.y+dy}
-        end
-
-        if (dist < bestCandidate.dist) then
-          if (not zom.locked) then zom.thinking = "Brains" end
-          bestCandidate.dist = dist
-          bestCandidate.char = brain
-          bestCandidate.x = brain.x
-          bestCandidate.y = brain.y
-        end
+    elseif (not zom.locked) and (bestCandidate.dist < 0.8) then -- should be 1, but give some near miss
+      local chain = findInChain(player, bestCandidate.char)
+      if (bestCandidate.char == player) then chain = player end
+      if chain then
+        bustChain(chain, 14) -- everyone panic!
       end
-      -- Now we have the nearest target
-
-      if (zom.hidden) then
-        if (bestCandidate.dist < 4.4) then
-          raiseTheUndead(zom)
-        end
-      elseif (not zom.locked) and (bestCandidate.dist < 0.8) then -- should be 1, but give some near miss
-        local chain = findInChain(player, bestCandidate.char)
-        if (bestCandidate.char == player) then chain = player end
-        if chain then
-          bustChain(chain, 14) -- everyone panic!
-        end
-        feedZombie(zom, bestCandidate.char)  -- flip the animation, flux triggers back to normal
-        removeSurvivor(bestCandidate.char)
-      elseif (not zom.moving) and (not zom.locked) then
-        local dx, dy = nearestPassable(zom, bestCandidate)
-        startMove(zom, 1/zom.speed, dx, dy)
-      end
+      feedZombie(zom, bestCandidate.char)  -- flip the animation, flux triggers back to normal
+      removeSurvivor(bestCandidate.char)
+    elseif (not zom.moving) and (not zom.locked) then
+      local dx, dy = nearestPassable(zom, bestCandidate)
+      startMove(zom, 1/zom.speed, dx, dy)
     end
   end
+end
 
-  raiseTheUndead = function(zombie)
-    zombie.locked = true
-    zombie.hidden = false
-    zombie.anim = zombie.anims['raise']
-    zombie.flux = flux.to(zombie, 1, {x=zombie.x}):oncomplete(unlockZombie)
-  end
+raiseTheUndead = function(zombie)
+  zombie.locked = true
+  zombie.hidden = false
+  zombie.anim = zombie.anims['raise']
+  zombie.flux = flux.to(zombie, 1, {x=zombie.x}):oncomplete(unlockZombie)
+end
 
-  loseLife = function()
-    player.moving = false
-    player.visible = true
+loseLife = function()
+  player.moving = false
+  player.visible = true
 
-    currentGame.Lives = currentGame.Lives - 1
-  end
+  currentGame.Lives = currentGame.Lives - 1
+end
 
-  unlockChar = function(ch) ch.locked = false end
+unlockChar = function(ch) ch.locked = false end
 
-  feedZombie = function(zombie, eaten)
-    zombie.thinking = "om nom nom"
+feedZombie = function(zombie, eaten)
+  zombie.thinking = "om nom nom"
 
-    if (zombie.flux) then zombie.flux:stop() end
-    if (eaten.flux) then eaten.flux:stop() end
-    zombie.moving = true
-    zombie.locked = true
+  if (zombie.flux) then zombie.flux:stop() end
+  if (eaten.flux) then eaten.flux:stop() end
+  zombie.moving = true
+  zombie.locked = true
 
-    zombie.x = near(eaten.x)
-    zombie.y = near(eaten.y)
-    eaten.x = near(eaten.x)
-    eaten.y = near(eaten.y)
+  zombie.x = near(eaten.x)
+  zombie.y = near(eaten.y)
+  eaten.x = near(eaten.x)
+  eaten.y = near(eaten.y)
 
-    love.audio.loop(assets.munchSnd, 4, 0.8)
+  love.audio.loop(assets.munchSnd, 4, 0.8)
 
-    if (player == eaten) then -- game over, man
-      zombie.anim = zombie.anims['feedPlayer']
-      zombie.anim:gotoFrame(2)
+  if (player == eaten) then -- game over, man
+    zombie.anim = zombie.anims['feedPlayer']
+    zombie.anim:gotoFrame(2)
 
-      player.anim = player.anims['stand']
-      player.visible = false
-      if (player.flux) then player.flux:stop() end
-      player.moving = true
-      player.locked = true
+    player.anim = player.anims['stand']
+    player.visible = false
+    if (player.flux) then player.flux:stop() end
+    player.moving = true
+    player.locked = true
 
-      if (currentGame.Lives == 1) then -- about to die. Start a fade-out
-        flux.to(gui, FeedingDuration * 2, {bloodTint = 0}):ease("linear")
-      end
-      player.flux = flux.to(player, FeedingDuration*1.4, {x = player.x}):oncomplete(unlockChar)
-      player.flux = flux.to(player, FeedingDuration, {x = player.x}):oncomplete(loseLife)
-    else -- oops. Not a survivor anymore.
-      currentGame.LevelSurvivorsEaten = currentGame.LevelSurvivorsEaten + 1
-      zombie.anim = zombie.anims['feedSurvivor']
-      zombie.anim:gotoFrame(2)
+    if (currentGame.Lives == 1) then -- about to die. Start a fade-out
+      flux.to(gui, FeedingDuration * 2, {bloodTint = 0}):ease("linear")
     end
-
-    zombie.flux = flux.to(zombie, FeedingDuration, {x = zombie.x}):oncomplete(sleepZombie)
+    player.flux = flux.to(player, FeedingDuration*1.4, {x = player.x}):oncomplete(unlockChar)
+    player.flux = flux.to(player, FeedingDuration, {x = player.x}):oncomplete(loseLife)
+  else -- oops. Not a survivor anymore.
+    currentGame.LevelSurvivorsEaten = currentGame.LevelSurvivorsEaten + 1
+    zombie.anim = zombie.anims['feedSurvivor']
+    zombie.anim:gotoFrame(2)
   end
 
-  sleepZombie = function(zombie)
-    zombie.thinking = 'zzz'
-    zombie.anim = zombie.anims['sleep']
-    zombie.flux = flux.to(zombie, FeedingDuration, {x = zombie.x}):oncomplete(unlockZombie)
-  end
+  zombie.flux = flux.to(zombie, FeedingDuration, {x = zombie.x}):oncomplete(sleepZombie)
+end
 
-  unlockZombie = function(zombie)
-    zombie.anim = zombie.anims['stand']
-    zombie.moving = false
-    zombie.locked = false
-  end
+sleepZombie = function(zombie)
+  zombie.thinking = 'zzz'
+  zombie.anim = zombie.anims['sleep']
+  zombie.flux = flux.to(zombie, FeedingDuration, {x = zombie.x}):oncomplete(unlockZombie)
+end
 
-  removeSurvivor = function(deadOne)
-    for i, surv in ipairs(survivors) do
-      if (surv == deadOne) then
-        table.remove(survivors, i)
-        currentGame.Score = currentGame.Score - 100 -- same as saving one.
-        return
-      end
+unlockZombie = function(zombie)
+  zombie.anim = zombie.anims['stand']
+  zombie.moving = false
+  zombie.locked = false
+end
+
+removeSurvivor = function(deadOne)
+  for i, surv in ipairs(survivors) do
+    if (surv == deadOne) then
+      table.remove(survivors, i)
+      currentGame.Score = currentGame.Score - 100 -- same as saving one.
+      return
     end
   end
+end
 
-  -- next passable direction (may go back, but doesn't look path finding)
-  nearestPassable = function(chSrc, chDst)
-    local dx = near(chDst.x - chSrc.x)
-    local dy = near(chDst.y - chSrc.y)
-    local prio; -- make a priority list, check each in turn
+-- next passable direction (may go back, but doesn't look path finding)
+nearestPassable = function(chSrc, chDst)
+  local dx = near(chDst.x - chSrc.x)
+  local dy = near(chDst.y - chSrc.y)
+  local prio; -- make a priority list, check each in turn
 
-    if (dx == 0 and dy == 0) then return 0,0 end
+  if (dx == 0 and dy == 0) then return 0,0 end
 
-    if (dx > 0) then dx1=1; dx2=-1 else dx2=1; dx1=-1 end
-    if (dy > 0) then dy1=1; dy2=-1 else dy2=1; dy1=-1 end
+  if (dx > 0) then dx1=1; dx2=-1 else dx2=1; dx1=-1 end
+  if (dy > 0) then dy1=1; dy2=-1 else dy2=1; dy1=-1 end
 
-    if (math.abs(dx) > math.abs(dy)) then
-      prio = {{x=dx1,y=0}, {x=0,y=dy1}, {x=0,y=dy2}, {x=dx2, y=0}}
+  if (math.abs(dx) > math.abs(dy)) then
+    prio = {{x=dx1,y=0}, {x=0,y=dy1}, {x=0,y=dy2}, {x=dx2, y=0}}
+  else
+    prio = {{x=0,y=dy1}, {x=dx1,y=0}, {x=dx2, y=0}, {x=0,y=dy2}}
+  end
+
+  for i,p in ipairs(prio) do
+    if level.isPassable(currentLevel, chSrc, p.x, p.y) then
+      return p.x, p.y
+    end
+  end
+  return 0,0
+end
+
+pinCardinal = function(chSrc, chDst)
+  local dx = chDst.x - chSrc.x
+  local dy = chDst.y - chSrc.y
+  if (math.abs(dx) > math.abs(dy)) then
+    if (dx > 0) then return 1,0
+    else return -1,0 end
+  else
+    if (dy > 0) then return 0,1
+    elseif (dy < 0) then return 0,-1
+    else return 0,0 end
+  end
+end
+
+startMoveChain = function(ch, duration)
+  if (ch and ch.followedBy) then
+    duration = duration or (1/ch.speed)
+    if (ch.followedBy.wait) then
+      ch.followedBy.wait = false
     else
-      prio = {{x=0,y=dy1}, {x=dx1,y=0}, {x=dx2, y=0}, {x=0,y=dy2}}
-    end
-
-    for i,p in ipairs(prio) do
-      if level.isPassable(currentLevel, chSrc, p.x, p.y) then
-        return p.x, p.y
-      end
-    end
-    return 0,0
-  end
-
-  pinCardinal = function(chSrc, chDst)
-    local dx = chDst.x - chSrc.x
-    local dy = chDst.y - chSrc.y
-    if (math.abs(dx) > math.abs(dy)) then
-      if (dx > 0) then return 1,0
-      else return -1,0 end
-    else
-      if (dy > 0) then return 0,1
-      elseif (dy < 0) then return 0,-1
-      else return 0,0 end
+      startMove(ch.followedBy, duration, -- always the same speed as leader
+      ch.x - ch.followedBy.x,
+      ch.y - ch.followedBy.y
+      )
     end
   end
-
-  startMoveChain = function(ch, duration)
-    if (ch and ch.followedBy) then
-      duration = duration or (1/ch.speed)
-      if (ch.followedBy.wait) then
-        ch.followedBy.wait = false
-      else
-        startMove(ch.followedBy, duration, -- always the same speed as leader
-        ch.x - ch.followedBy.x,
-        ch.y - ch.followedBy.y
-        )
-      end
-    end
-  end
+end
 
 endMove = function(ch)
   -- return to idle animation
@@ -673,6 +687,7 @@ endMove = function(ch)
 
   if (ch == player) then
     survivorPickupDetect()
+    coinPickupDetect()
     local house = inSafeHouse(player)
     if house then escapeSurvivors(player, house) end
   end
@@ -797,6 +812,17 @@ survivorEscapes = function(surv, index, safehouse)
   end
 end
 
+coinPickupDetect = function()
+  for i=1, #coins do
+    local coin = coins[i]
+    if coin and sameTile(player, coin) then
+      table.remove(coins, i)
+      love.audio.play(assets.coinSnd)
+      currentGame.Score = currentGame.Score + 10
+    end
+  end
+end
+
 survivorPickupDetect = function()
   for i, surv in ipairs(survivors) do
     if    (not surv.locked) -- available for interaction
@@ -816,7 +842,7 @@ survivorPickupDetect = function()
 end
 
 pickupSurvivor = function(surv)
-  assets.pickupSnd:play()
+  love.audio.play(assets.pickupSnd)
   surv.followedBy = player.followedBy
   player.followedBy = surv
   surv.wait = true -- fix conga overlap
@@ -888,26 +914,6 @@ drawHUD = function()
   love.graphics.print(currentGame.Lives, 84, screenHeight - 50, 0, 2)
 
   if (currentGame.Lives < 1) then centreBigString("GAME OVER", screenWidth/2,screenHeight/2,4) end
-
-  --[[ -- mapping details for my cheap snes pad
-  if (gamepad) then
-  if (gamepad:isGamepad()) then
-  love.graphics.print("Game pad connected", 84, screenHeight/2, 0, 2)
-else
-dir = gamepad:getAxis(1) -- left = -1, right = 1
-dir = gamepad:getAxis(2) -- up = -1, down = 1
-local descr = ""
-if gamepad:isDown(10) then descr = "start" end
-if gamepad:isDown(9) then descr = "select" end
-if gamepad:isDown(4) then descr = "Y" end
-if gamepad:isDown(3) then descr = "B" end
-if gamepad:isDown(1) then descr = "X" end
-if gamepad:isDown(2) then descr = "A" end
-love.graphics.print(descr, 84, screenHeight/2, 0, 2)
-end
-else
-love.graphics.print("no pad", 84, screenHeight/2, 0, 2)
-end]]
 end
 
 drawControlHints = function()

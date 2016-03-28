@@ -157,11 +157,12 @@ listCreeps = function(level, creepList, byteData)
   local mapHeight = level.height
   local idx
 
-  for x=0,mapWidth do
-    for y=0,mapHeight do
+
+  for y=0,mapHeight do
+    for x=0,mapWidth do
       idx = tileIndex(byteData, (y*mapWidth)+x)
       if (idx and idx > 0) then
-        table.insert(creepList, {x=x, y=y, type=0+idx})
+        table.insert(creepList, {x=x+1, y=y, type=0+idx})
       end
     end
   end

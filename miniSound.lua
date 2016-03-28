@@ -5,6 +5,7 @@
 do
   -- will hold the currently playing sources
   local sources = {}
+  local muted = false
 
   -- check for sources that finished playing and remove them
   -- add to love.update
@@ -22,13 +23,14 @@ do
     end
 
     for i,s in ipairs(remove) do
-      sources[s] = nil
+      sources[s.src] = nil
     end
   end
 
   -- overwrite love.audio.play to create and register source if needed
   local play = love.audio.play
   function love.audio.play(what, how, loop)
+    if (muted) then return end
     local src = what
     if type(what) ~= "userdata" or not what:typeOf("Source") then
       src = love.audio.newSource(what, how)
@@ -43,11 +45,13 @@ do
   -- rewind and play the source.
   -- useful for quickly repeated blips
   function love.audio.replay(src)
+    if (muted) then return end
     love.audio.rewind(src)
     play(src)
   end
 
   function love.audio.loop(src, howMany, delay)
+    if (muted) then return end
     play(src)
     delay = delay or 0
     sources[src] = {src=src, lc=(howMany-1), d=delay, t=delay}
@@ -60,5 +64,13 @@ do
     if not src then return end
     stop(src)
     sources[src] = nil
+  end
+
+  -- stop all sources and don't play new ones
+  function love.audio.mute()
+    muted = true
+    for _,s in pairs(sources) do
+      love.audio.stop(s.src)
+    end
   end
 end

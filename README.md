@@ -10,6 +10,7 @@ What happens when you mix pac-man and snake, then add zombies?
 * Path finding
 * Eaten survivors turn into zombie <-- I like this one
 * Fed zombies get quicker
+* minimum survivor save
 
 ##Todo:
 Basics
@@ -22,9 +23,13 @@ Basics
 * [x] AI / interactions
 
 Specifics
-* [-] road wrap around ?
+* [ ] save/load game
 * [x] brain munching
 * [x] level completion
-* [ ] coins & weapons
+* [x] coins
+* [ ] weapons
 * [x] tutorial levels
-* [ ] title screen
+* [x] title screen
+* [ ] gamepad config
+* [ ] keypress config
+* [ ] bonuses for all survivors, all coins, fast times

@@ -405,8 +405,8 @@ readInputs = function()
 end
 
 near = function(a)
-  return math.floor(a+0.5)
-end -- crap, but will do for map indexes
+  return math.floor(a+0.5) -- crap, but will do for map indexes
+end
 
 sameTile = function(chr1, chr2, c1dx, c1dy)
   local dx = c1dx or 0
@@ -561,7 +561,9 @@ loseLife = function()
   currentGame.Lives = currentGame.Lives - 1
 end
 
-unlockChar = function(ch) ch.locked = false end
+unlockChar = function(ch)
+  ch.locked = false
+end
 
 feedZombie = function(zombie, eaten)
   zombie.thinking = "om nom nom"

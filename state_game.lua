@@ -16,6 +16,7 @@ local assets -- local copy of game-wide assets
 local zombies = {}
 local survivors = {}
 local coins = {}
+local weapons = {}
 local gui = {anims={}, bloodTint = 255}
 local FeedingDuration = 3 -- shorter is harder
 
@@ -79,6 +80,7 @@ LoadState = function(levelName, gameState)
   zombies = {}
   survivors = {}
   coins = {}
+  weapons = {}
   player = deepcopy(protoPlayer)
 
   currentGame = gameState
@@ -100,6 +102,8 @@ LoadState = function(levelName, gameState)
       table.insert(survivors, makeSurvivor(creep.x, creep.y, true))
     elseif creep.type == 251 then -- coin
       table.insert(coins, {anim=gui.anims['coin'], x=creep.x, y=creep.y})
+    elseif creep.type == 250 then -- chainsaw
+      table.insert(weapons, {anim=gui.anims['chainsaw'], x=creep.x, y=creep.y})
     end
   end
 
@@ -123,8 +127,13 @@ Draw = function()
   local charRows = {}
 
   if (currentGame.Lives > 0) then
-    -- TODO: only add visible chars to `charRows`
+    -- TODO: only add on-screen chars to `charRows`
     for _,char in ipairs(coins) do
+      if char then
+        appendMap(charRows, char, level.posToRow(char, currentLevel))
+      end
+    end
+    for _,char in ipairs(weapons) do
       if char then
         appendMap(charRows, char, level.posToRow(char, currentLevel))
       end
@@ -166,6 +175,14 @@ Draw = function()
     end
     level.drawFgRow(row, currentLevel, mapOffset, gui.bloodTint)
   end
+
+  -- test : chainsaws!
+  gui.anims['chainsawR']:draw(
+    assets.creepSheet,
+    math.floor(sceneX + (player.x+0.7)*zts),
+    math.floor(sceneY + (player.y+0.8)*zts),
+    0, zoom
+  )
 
   -- be nice to the gc, assuming it does fast gen 0
   charRows = nil
@@ -233,6 +250,8 @@ Initialise = function(coreAssets)
   gui.anims['life'] = anim8.newAnimation(grid('1-2',11), {4,0.4})
   gui.anims['remaining'] = anim8.newAnimation(grid('1-3',12), 1.4)
   gui.anims['coin'] = anim8.newAnimation(grid(10,'6-8', 10,'8-6'), 0.1)
+  gui.anims['chainsaw'] = anim8.newAnimation(grid(13,'1-2'), 0.1)
+  gui.anims['chainsawR'] = anim8.newAnimation(grid(14,'1-2'), 0.1)
   protoPlayer.anims['shove'] = anim8.newAnimation(grid(9,'6-11'), 0.04, 'pauseAtEnd')
 
   protoZombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)

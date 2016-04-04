@@ -21,6 +21,7 @@ Basics
 * [ ] Music
 * [x] Tile background
 * [x] AI / interactions
+* [ ] separate out control module
 
 Specifics
 * [ ] save/load game

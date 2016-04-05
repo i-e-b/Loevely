@@ -177,12 +177,26 @@ Draw = function()
   end
 
   -- test : chainsaws!
+  --[[
   gui.anims['chainsawR']:draw(
     assets.creepSheet,
     math.floor(sceneX + (player.x+0.7)*zts),
     math.floor(sceneY + (player.y+0.8)*zts),
     0, zoom
   )
+  gui.anims['chainsawL']:draw(
+    assets.creepSheet,
+    math.floor(sceneX + (player.x-0.7)*zts),
+    math.floor(sceneY + (player.y+0.8)*zts),
+    0, zoom
+  )
+  gui.anims['chainsawD']:draw(
+    assets.creepSheet,
+    math.floor(sceneX + (player.x-0.4)*zts),
+    math.floor(sceneY + (player.y+1.4)*zts),
+    0, zoom
+  )
+  ]]
 
   -- be nice to the gc, assuming it does fast gen 0
   charRows = nil
@@ -252,6 +266,8 @@ Initialise = function(coreAssets)
   gui.anims['coin'] = anim8.newAnimation(grid(10,'6-8', 10,'8-6'), 0.1)
   gui.anims['chainsaw'] = anim8.newAnimation(grid(13,'1-2'), 0.1)
   gui.anims['chainsawR'] = anim8.newAnimation(grid(14,'1-2'), 0.1)
+  gui.anims['chainsawL'] = anim8.newAnimation(grid(14,'3-4'), 0.1)
+  gui.anims['chainsawD'] = anim8.newAnimation(grid(15,'1-2'), 0.1)
   protoPlayer.anims['shove'] = anim8.newAnimation(grid(9,'6-11'), 0.04, 'pauseAtEnd')
 
   protoZombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)

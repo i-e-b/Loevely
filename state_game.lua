@@ -69,7 +69,7 @@ local Draw, Initialise, CreateNewGameState, AdvanceLevel, resetLevelCounters,
       startWarp, endWarp, escapeSurvivors, lockAndScoreChain, survivorEscapes,
       survivorPickupDetect, pickupSurvivor, findInChain, bustChain, appendMap,
       centreSmallString, centreBigString, rightAlignSmallString, drawHUD,
-      drawControlHints, coinPickupDetect;
+      drawControlHints, coinPickupDetect, drawPlayer;
 
 -- Load a gameState and level ready for play.
 -- Start calling Draw() and Update() to run the level
@@ -165,38 +165,30 @@ Draw = function()
         if (char.thinking) then
           centreSmallString(char.thinking,sceneX + (char.x+0.5)*zts,sceneY + (char.y+0.4)*zts,zoom/2)
         end
-        char.anim:draw(
-          assets.creepSheet,
-          math.floor(sceneX + char.x*zts),
-          math.floor(sceneY + (char.y+0.8)*zts),
-          0, zoom
-        )
+
+        if char == player --[[and using chainsaw]] then
+          drawPlayer(sceneX, sceneY, zts, zoom)
+        else
+          char.anim:draw(
+            assets.creepSheet,
+            math.floor(sceneX + char.x*zts),
+            math.floor(sceneY + (char.y+0.8)*zts),
+            0, zoom
+          )
+        end
       end
     end
     level.drawFgRow(row, currentLevel, mapOffset, gui.bloodTint)
   end
 
-  -- test : chainsaws!
-  --[[
-  gui.anims['chainsawR']:draw(
-    assets.creepSheet,
-    math.floor(sceneX + (player.x+0.7)*zts),
-    math.floor(sceneY + (player.y+0.8)*zts),
-    0, zoom
-  )
-  gui.anims['chainsawL']:draw(
-    assets.creepSheet,
-    math.floor(sceneX + (player.x-0.7)*zts),
-    math.floor(sceneY + (player.y+0.8)*zts),
-    0, zoom
-  )
-  gui.anims['chainsawD']:draw(
-    assets.creepSheet,
-    math.floor(sceneX + (player.x-0.4)*zts),
-    math.floor(sceneY + (player.y+1.4)*zts),
-    0, zoom
-  )
-  ]]
+  if (lastDy == 1) --[[and using chainsaw]]  then
+    gui.anims['chainsawD']:draw(
+      assets.creepSheet,
+      math.floor(sceneX + (player.x-0.4)*zts),
+      math.floor(sceneY + (player.y+1.4)*zts),
+      0, zoom
+    )
+  end
 
   -- be nice to the gc, assuming it does fast gen 0
   charRows = nil
@@ -214,6 +206,40 @@ Draw = function()
 
   drawControlHints()  --near last, the control outlines
   drawHUD()  -- FPS counter, score, survivor count - always last.
+end
+
+drawPlayer = function(sceneX, sceneY, zts, zoom)
+  if (lastDy == -1) then
+    gui.anims['chainsawU']:draw(
+      assets.creepSheet,
+      math.floor(sceneX + (player.x+0.3)*zts),
+      math.floor(sceneY + (player.y+0.5)*zts),
+      0, zoom
+    )
+  end
+
+  player.anim:draw(
+    assets.creepSheet,
+    math.floor(sceneX + player.x*zts),
+    math.floor(sceneY + (player.y+0.8)*zts),
+    0, zoom
+  )
+
+  if (lastDx == 1) then
+    gui.anims['chainsawR']:draw(
+      assets.creepSheet,
+      math.floor(sceneX + (player.x+0.7)*zts),
+      math.floor(sceneY + (player.y+0.8)*zts),
+      0, zoom
+    )
+  elseif (lastDx == -1) or (lastDx == 0 and lastDy == 0) then
+    gui.anims['chainsawL']:draw(
+      assets.creepSheet,
+      math.floor(sceneX + (player.x-0.7)*zts),
+      math.floor(sceneY + (player.y+0.8)*zts),
+      0, zoom
+    )
+  end
 end
 
 Update = function(dt, _, connectedPad)
@@ -268,6 +294,7 @@ Initialise = function(coreAssets)
   gui.anims['chainsawR'] = anim8.newAnimation(grid(14,'1-2'), 0.1)
   gui.anims['chainsawL'] = anim8.newAnimation(grid(14,'3-4'), 0.1)
   gui.anims['chainsawD'] = anim8.newAnimation(grid(15,'1-2'), 0.1)
+  gui.anims['chainsawU'] = anim8.newAnimation(grid(15,'3-4'), 0.1)
   protoPlayer.anims['shove'] = anim8.newAnimation(grid(9,'6-11'), 0.04, 'pauseAtEnd')
 
   protoZombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)
@@ -783,23 +810,25 @@ updateControl = function()
   end
 
   -- check for obstructions, and start the move animation
-  if not player.moving and (dx ~= 0 or dy ~= 0) then
-    if (player.followedBy and sameTile(player, player.followedBy, dx, dy)) then
-      -- trying to push back against the chain, panic them rather than blocking
-      shoveFlash(player, player.followedBy)
-      bustChain(player)
+  if not player.moving then
+    if (dx ~= 0 or dy ~= 0) then
+      if (player.followedBy and sameTile(player, player.followedBy, dx, dy)) then
+        -- trying to push back against the chain, panic them rather than blocking
+        shoveFlash(player, player.followedBy)
+        bustChain(player)
+      end
+      if (level.isPassable(currentLevel, player, dx, dy)) then
+        player.moving = true
+        love.audio.replay(assets.walkSnd)
+        startMove(player, 1/player.speed, dx, dy)
+      else
+        dx =  0; dy = 0
+      end
     end
-    if (level.isPassable(currentLevel, player, dx, dy)) then
-      player.moving = true
-      love.audio.replay(assets.walkSnd)
-      startMove(player, 1/player.speed, dx, dy)
-    else
-      dx =  0; dy = 0
-    end
-  end
 
-  lastDx = dx
-  lastDy = dy
+    lastDx = dx
+    lastDy = dy
+  end
 end
 
 startWarp = function()

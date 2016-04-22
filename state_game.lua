@@ -47,7 +47,8 @@ local protoPlayer = { -- NPCs follow the same structure
   moving = false,       -- is player moving between tiles?
   warping = false,      -- is player roving around the sewers?
   followedBy = nil,     -- next element in survivor chain
-  visible = true        -- if false, char is not drawn (for warping and overlay animations)
+  visible = true,       -- if false, char is not drawn (for warping and overlay animations)
+  chainsawTime = 0      -- if > 0, we have the saw. Time counts down
   --waiting = false       -- should skip the next follow turn (survivors)
   --panic = 0             -- how many rounds of panic left (survivors)
   --locked = false        -- character is locked into an animation, don't interact
@@ -69,7 +70,7 @@ local Draw, Initialise, CreateNewGameState, AdvanceLevel, resetLevelCounters,
       startWarp, endWarp, escapeSurvivors, lockAndScoreChain, survivorEscapes,
       survivorPickupDetect, pickupSurvivor, findInChain, bustChain, appendMap,
       centreSmallString, centreBigString, rightAlignSmallString, drawHUD,
-      drawControlHints, coinPickupDetect;
+      drawControlHints, coinPickupDetect, killZombie;
 
 
 -- Load assets and do load-time stuff
@@ -97,7 +98,7 @@ Initialise = function(coreAssets)
   protoZombie.anims['feedPlayer'] = anim8.newAnimation(grid(7,'8-9'), 0.4)
   protoZombie.anims['sleep'] = anim8.newAnimation(grid(8,'6-7'), 0.7)
   protoZombie.anims['raise'] = anim8.newAnimation(grid(8,'8-10'), 0.333, 'pauseAtEnd')
-  protoZombie.anims['slain'] = anim8.newAnimation(grid(8,6), 1)
+  protoZombie.anims['slain'] = anim8.newAnimation(grid(8,9), 1)
 
   protoPlayer.anims['shove'] = anim8.newAnimation(grid(9,'6-11'), 0.04, 'pauseAtEnd')
   protoPlayer.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
@@ -183,13 +184,13 @@ Draw = function()
         appendMap(charRows, char, level.posToRow(char, currentLevel))
       end
     end
-    for _,char in ipairs(weapons) do
-      if char then
+    for _,char in ipairs(zombies) do
+      if (not char.hidden) then
         appendMap(charRows, char, level.posToRow(char, currentLevel))
       end
     end
-    for _,char in ipairs(zombies) do
-      if (not char.hidden) then
+    for _,char in ipairs(weapons) do
+      if char then
         appendMap(charRows, char, level.posToRow(char, currentLevel))
       end
     end
@@ -206,7 +207,8 @@ Draw = function()
     level.drawBgRow(row, currentLevel, mapOffset, gui.bloodTint)
     -- pick chars in slots
     if (charRows[row]) then
-      for i,char in ipairs(charRows[row]) do
+      for i=1, #charRows[row] do
+        local char = (charRows[row])[i]
         if (char.color and not endLevelTransition) then -- tints
           love.graphics.setColor(char.color.r, char.color.g, char.color.b, 255)
         else
@@ -217,12 +219,12 @@ Draw = function()
         end
 
 
-          char.anim:draw(
-            assets.creepSheet,
-            math.floor(sceneX + char.x*zts),
-            math.floor(sceneY + (char.y+0.8)*zts),
-            0, zoom
-          )
+        char.anim:draw(
+          assets.creepSheet,
+          math.floor(sceneX + char.x*zts),
+          math.floor(sceneY + (char.y+0.8)*zts),
+          0, zoom
+        )
       end
     end
     level.drawFgRow(row, currentLevel, mapOffset, gui.bloodTint)
@@ -519,50 +521,56 @@ updateZombies = function()
   end
 
   for i, zom in ipairs(zombies) do
-    -- Find the nearest brain within 5 moves, or wander aimlessly
-    -- we set an artificial best candidate to define the wander and trigger radius
-    local bestCandidate = {
-      dist=6,
-      --[[x = math.random(1, currentLevel.width), -- generally tend to the middle
-      y = math.random(1, currentLevel.height)]]
-      --[[]] x = zom.x + math.random(-2, 2), -- wander at random, less biased
-      y = zom.y + math.random(-2, 2)
-    }
-    if (not zom.locked) then zom.thinking = "" end
+    if not zom.dead then -- stupid lack of continue
+      -- Find the nearest brain within 5 moves, or wander aimlessly
+      -- we set an artificial best candidate to define the wander and trigger radius
+      local bestCandidate = {
+        dist=6,
+        --[[x = math.random(1, currentLevel.width), -- generally tend to the middle
+        y = math.random(1, currentLevel.height)]]
+        --[[]] x = zom.x + math.random(-2, 2), -- wander at random, less biased
+        y = zom.y + math.random(-2, 2)
+      }
+      if (not zom.locked) then zom.thinking = "" end
 
-    for j, brain in ipairs(brains) do
-      -- inject 'run away' direction into the target
-      local dist = math.abs(zom.x - brain.x) + math.abs(zom.y - brain.y) -- no diagonals, so manhattan distance is fine
-      local dx, dy = pinCardinal(zom, brain) -- flee direction
-      if (not brain.flee) or (brain.flee.dist > dist) then -- always flee the nearest zombie!
-        brain.flee = {dist=dist, x=brain.x+dx, y=brain.y+dy}
-      end
+      for j, brain in ipairs(brains) do
+        -- inject 'run away' direction into the target
+        local dist = math.abs(zom.x - brain.x) + math.abs(zom.y - brain.y) -- no diagonals, so manhattan distance is fine
+        local dx, dy = pinCardinal(zom, brain) -- flee direction
+        if (not brain.flee) or (brain.flee.dist > dist) then -- always flee the nearest zombie!
+          brain.flee = {dist=dist, x=brain.x+dx, y=brain.y+dy}
+        end
 
-      if (dist < bestCandidate.dist) then
-        if (not zom.locked) then zom.thinking = "Brains" end
-        bestCandidate.dist = dist
-        bestCandidate.char = brain
-        bestCandidate.x = brain.x
-        bestCandidate.y = brain.y
+        if (dist < bestCandidate.dist) then
+          if (not zom.locked) then zom.thinking = "Brains" end
+          bestCandidate.dist = dist
+          bestCandidate.char = brain
+          bestCandidate.x = brain.x
+          bestCandidate.y = brain.y
+        end
       end
-    end
-    -- Now we have the nearest target
+      -- Now we have the nearest target
 
-    if (zom.hidden) then
-      if (bestCandidate.dist < 4.4) then
-        raiseTheUndead(zom)
+      if (zom.hidden) then
+        if (bestCandidate.dist < 4.4) then
+          raiseTheUndead(zom)
+        end
+      elseif (not zom.locked) and (bestCandidate.dist < 0.8) then -- should be 1, but give some near miss
+        local chain = findInChain(player, bestCandidate.char)
+        if (bestCandidate.char == player) then chain = player end
+        if (chain.chainsawTime and chain.chainsawTime > 0) then -- bye zombie
+          killZombie(zom)
+        else -- feed the zombie
+          if chain then
+            bustChain(chain, 14) -- everyone panic!
+          end
+          feedZombie(zom, bestCandidate.char)  -- flip the animation, flux triggers back to normal
+          removeSurvivor(bestCandidate.char)
+        end
+      elseif (not zom.moving) and (not zom.locked) then
+        local dx, dy = nearestPassable(zom, bestCandidate)
+        startMove(zom, 1/zom.speed, dx, dy)
       end
-    elseif (not zom.locked) and (bestCandidate.dist < 0.8) then -- should be 1, but give some near miss
-      local chain = findInChain(player, bestCandidate.char)
-      if (bestCandidate.char == player) then chain = player end
-      if chain then
-        bustChain(chain, 14) -- everyone panic!
-      end
-      feedZombie(zom, bestCandidate.char)  -- flip the animation, flux triggers back to normal
-      removeSurvivor(bestCandidate.char)
-    elseif (not zom.moving) and (not zom.locked) then
-      local dx, dy = nearestPassable(zom, bestCandidate)
-      startMove(zom, 1/zom.speed, dx, dy)
     end
   end
 end
@@ -583,6 +591,16 @@ end
 
 unlockChar = function(ch)
   ch.locked = false
+end
+
+killZombie = function(zombie)
+  if zombie.flux then zombie.flux:stop() end -- they can be off-grid now
+  currentGame.LevelZombiesMinced = currentGame.LevelZombiesMinced + 1
+  zombie.thinking = ''
+  zombie.anim = zombie.anims['slain']
+  zombie.moving = false
+  zombie.locked = true -- and no unlock trigger
+  zombie.dead = true
 end
 
 feedZombie = function(zombie, eaten)
@@ -700,7 +718,11 @@ end
 
 endMove = function(ch)
   -- return to idle animation
-  ch.anim = ch.anims['chain-stand'] or ch.anims['stand']
+  if (ch.chainsawTime and ch.chainsawTime > 0) then
+    ch.anim = ch.anims['chain-stand']
+  else
+    ch.anim = ch.anims['stand']
+  end
   ch.flux = nil
 
   -- reduce panic (survivors)
@@ -723,11 +745,14 @@ startMove = function (ch, duration, dx, dy)
   if ch.flux then ch.flux:stop() end
   ch.moving = true -- so movement can be locked
 
+  local ischain = ''
+  if (ch.chainsawTime and ch.chainsawTime > 0) then ischain = 'chain-' end
+
   -- set directional animation
-  if (dx == 1) then ch.anim = ch.anims['chain-right'] or ch.anims['right']
-  elseif (dx == -1) then ch.anim = ch.anims['chain-left'] or ch.anims['left']
-  elseif (dy == 1) then ch.anim = ch.anims['chain-down'] or ch.anims['down']
-  elseif (dy == -1) then ch.anim = ch.anims['chain-up'] or ch.anims['up'] end
+  if (dx == 1) then ch.anim = ch.anims[ischain..'right']
+  elseif (dx == -1) then ch.anim = ch.anims[ischain..'left']
+  elseif (dy == 1) then ch.anim = ch.anims[ischain..'down']
+  elseif (dy == -1) then ch.anim = ch.anims[ischain..'up'] end
 
   -- move to next tile
   ch.flux = flux.to(ch, duration, {x=ch.x+dx, y=ch.y+dy })

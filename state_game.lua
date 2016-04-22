@@ -69,7 +69,57 @@ local Draw, Initialise, CreateNewGameState, AdvanceLevel, resetLevelCounters,
       startWarp, endWarp, escapeSurvivors, lockAndScoreChain, survivorEscapes,
       survivorPickupDetect, pickupSurvivor, findInChain, bustChain, appendMap,
       centreSmallString, centreBigString, rightAlignSmallString, drawHUD,
-      drawControlHints, coinPickupDetect, drawPlayer;
+      drawControlHints, coinPickupDetect;
+
+
+-- Load assets and do load-time stuff
+-- Call this before anything else
+Initialise = function(coreAssets)
+  assets = coreAssets
+  screenWidth, screenHeight = love.graphics.getDimensions( )
+
+  local sw = assets.creepSheet:getWidth()
+  local sh = assets.creepSheet:getHeight()
+
+  local grid = anim8.newGrid(17, 18, sw, sh, 0, 0)
+
+  gui.anims['life'] = anim8.newAnimation(grid('1-2',11), {4,0.4})
+  gui.anims['remaining'] = anim8.newAnimation(grid('1-3',12), 1.4)
+  gui.anims['coin'] = anim8.newAnimation(grid(10,'6-8', 10,'8-6'), 0.1)
+  gui.anims['chainsaw'] = anim8.newAnimation(grid(13,'1-2'), 0.1)
+
+  protoZombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)
+  protoZombie.anims['right'] = anim8.newAnimation(grid('9-12',2), 0.2)
+  protoZombie.anims['left'] = anim8.newAnimation(grid('9-12',3), 0.2)
+  protoZombie.anims['up'] = anim8.newAnimation(grid('9-12',4), 0.2)
+  protoZombie.anims['stand'] = anim8.newAnimation(grid(7,'1-4'), 0.7)
+  protoZombie.anims['feedSurvivor'] = anim8.newAnimation(grid(7,'6-7'), 0.4)
+  protoZombie.anims['feedPlayer'] = anim8.newAnimation(grid(7,'8-9'), 0.4)
+  protoZombie.anims['sleep'] = anim8.newAnimation(grid(8,'6-7'), 0.7)
+  protoZombie.anims['raise'] = anim8.newAnimation(grid(8,'8-10'), 0.333, 'pauseAtEnd')
+  protoZombie.anims['slain'] = anim8.newAnimation(grid(8,6), 1)
+
+  protoPlayer.anims['shove'] = anim8.newAnimation(grid(9,'6-11'), 0.04, 'pauseAtEnd')
+  protoPlayer.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
+  protoPlayer.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
+  protoPlayer.anims['left'] = anim8.newAnimation(grid('1-4',3), 0.1)
+  protoPlayer.anims['up'] = anim8.newAnimation(grid('1-4',4), 0.1)
+  protoPlayer.anims['stand'] = anim8.newAnimation(grid(6,'1-3', 6,1, 6,4), {0.8,0.4,0.4,0.7,0.2})
+  protoPlayer.anims['chain-down'] = anim8.newAnimation(grid('11-14',6), 0.1)
+  protoPlayer.anims['chain-right'] = anim8.newAnimation(grid('11-14',7), 0.1)
+  protoPlayer.anims['chain-left'] = anim8.newAnimation(grid('11-14',8), 0.1)
+  protoPlayer.anims['chain-up'] = anim8.newAnimation(grid('11-14',9), 0.1)
+  protoPlayer.anims['chain-stand'] = anim8.newAnimation(grid(16,'6-8', 16,6, 16,9), {0.8,0.4,0.4,0.7,0.2})
+  protoPlayer.anim = protoPlayer.anims['stand']
+
+  protoSurvivor.anims['down'] = anim8.newAnimation(grid('1-4',6), 0.1)
+  protoSurvivor.anims['right'] = anim8.newAnimation(grid('1-4',7), 0.1)
+  protoSurvivor.anims['left'] = anim8.newAnimation(grid('1-4',8), 0.1)
+  protoSurvivor.anims['up'] = anim8.newAnimation(grid('1-4',9), 0.1)
+  protoSurvivor.anims['help'] = anim8.newAnimation(grid(6,'6-9'), 0.4)
+  protoSurvivor.anims['stand'] = anim8.newAnimation(grid(6,'6-7'), 1)
+end
+
 
 -- Load a gameState and level ready for play.
 -- Start calling Draw() and Update() to run the level
@@ -166,28 +216,16 @@ Draw = function()
           centreSmallString(char.thinking,sceneX + (char.x+0.5)*zts,sceneY + (char.y+0.4)*zts,zoom/2)
         end
 
-        if char == player --[[and using chainsaw]] then
-          drawPlayer(sceneX, sceneY, zts, zoom)
-        else
+
           char.anim:draw(
             assets.creepSheet,
             math.floor(sceneX + char.x*zts),
             math.floor(sceneY + (char.y+0.8)*zts),
             0, zoom
           )
-        end
       end
     end
     level.drawFgRow(row, currentLevel, mapOffset, gui.bloodTint)
-  end
-
-  if (lastDy == 1) --[[and using chainsaw]]  then
-    gui.anims['chainsawD']:draw(
-      assets.creepSheet,
-      math.floor(sceneX + (player.x-0.4)*zts),
-      math.floor(sceneY + (player.y+1.4)*zts),
-      0, zoom
-    )
   end
 
   -- be nice to the gc, assuming it does fast gen 0
@@ -206,40 +244,6 @@ Draw = function()
 
   drawControlHints()  --near last, the control outlines
   drawHUD()  -- FPS counter, score, survivor count - always last.
-end
-
-drawPlayer = function(sceneX, sceneY, zts, zoom)
-  if (lastDy == -1) then
-    gui.anims['chainsawU']:draw(
-      assets.creepSheet,
-      math.floor(sceneX + (player.x+0.3)*zts),
-      math.floor(sceneY + (player.y+0.5)*zts),
-      0, zoom
-    )
-  end
-
-  player.anim:draw(
-    assets.creepSheet,
-    math.floor(sceneX + player.x*zts),
-    math.floor(sceneY + (player.y+0.8)*zts),
-    0, zoom
-  )
-
-  if (lastDx == 1) then
-    gui.anims['chainsawR']:draw(
-      assets.creepSheet,
-      math.floor(sceneX + (player.x+0.7)*zts),
-      math.floor(sceneY + (player.y+0.8)*zts),
-      0, zoom
-    )
-  elseif (lastDx == -1) or (lastDx == 0 and lastDy == 0) then
-    gui.anims['chainsawL']:draw(
-      assets.creepSheet,
-      math.floor(sceneX + (player.x-0.7)*zts),
-      math.floor(sceneY + (player.y+0.8)*zts),
-      0, zoom
-    )
-  end
 end
 
 Update = function(dt, _, connectedPad)
@@ -274,52 +278,6 @@ Update = function(dt, _, connectedPad)
 
   -- adjust display grid and mapOffset
   level.moveMap(currentLevel, targetX, targetY, mapOffset)
-end
-
--- Load assets and do load-time stuff
--- Call this before anything else
-Initialise = function(coreAssets)
-  assets = coreAssets
-  screenWidth, screenHeight = love.graphics.getDimensions( )
-
-  local sw = assets.creepSheet:getWidth()
-  local sh = assets.creepSheet:getHeight()
-
-  local grid = anim8.newGrid(17, 18, sw, sh, 0, 0)
-
-  gui.anims['life'] = anim8.newAnimation(grid('1-2',11), {4,0.4})
-  gui.anims['remaining'] = anim8.newAnimation(grid('1-3',12), 1.4)
-  gui.anims['coin'] = anim8.newAnimation(grid(10,'6-8', 10,'8-6'), 0.1)
-  gui.anims['chainsaw'] = anim8.newAnimation(grid(13,'1-2'), 0.1)
-  gui.anims['chainsawR'] = anim8.newAnimation(grid(14,'1-2'), 0.1)
-  gui.anims['chainsawL'] = anim8.newAnimation(grid(14,'3-4'), 0.1)
-  gui.anims['chainsawD'] = anim8.newAnimation(grid(15,'1-2'), 0.1)
-  gui.anims['chainsawU'] = anim8.newAnimation(grid(15,'3-4'), 0.1)
-  protoPlayer.anims['shove'] = anim8.newAnimation(grid(9,'6-11'), 0.04, 'pauseAtEnd')
-
-  protoZombie.anims['down'] = anim8.newAnimation(grid('9-12',1), 0.2)
-  protoZombie.anims['right'] = anim8.newAnimation(grid('9-12',2), 0.2)
-  protoZombie.anims['left'] = anim8.newAnimation(grid('9-12',3), 0.2)
-  protoZombie.anims['up'] = anim8.newAnimation(grid('9-12',4), 0.2)
-  protoZombie.anims['stand'] = anim8.newAnimation(grid(7,'1-4'), 0.7)
-  protoZombie.anims['feedSurvivor'] = anim8.newAnimation(grid(7,'6-7'), 0.4)
-  protoZombie.anims['feedPlayer'] = anim8.newAnimation(grid(7,'8-9'), 0.4)
-  protoZombie.anims['sleep'] = anim8.newAnimation(grid(8,'6-7'), 0.7)
-  protoZombie.anims['raise'] = anim8.newAnimation(grid(8,'8-10'), 0.333, 'pauseAtEnd')
-
-  protoPlayer.anims['down'] = anim8.newAnimation(grid('1-4',1), 0.1)
-  protoPlayer.anims['right'] = anim8.newAnimation(grid('1-4',2), 0.1)
-  protoPlayer.anims['left'] = anim8.newAnimation(grid('1-4',3), 0.1)
-  protoPlayer.anims['up'] = anim8.newAnimation(grid('1-4',4), 0.1)
-  protoPlayer.anims['stand'] = anim8.newAnimation(grid(6,'1-3', 6,1, 6,4), {0.8,0.4,0.4,0.7,0.2})
-  protoPlayer.anim = protoPlayer.anims['stand']
-
-  protoSurvivor.anims['down'] = anim8.newAnimation(grid('1-4',6), 0.1)
-  protoSurvivor.anims['right'] = anim8.newAnimation(grid('1-4',7), 0.1)
-  protoSurvivor.anims['left'] = anim8.newAnimation(grid('1-4',8), 0.1)
-  protoSurvivor.anims['up'] = anim8.newAnimation(grid('1-4',9), 0.1)
-  protoSurvivor.anims['help'] = anim8.newAnimation(grid(6,'6-9'), 0.4)
-  protoSurvivor.anims['stand'] = anim8.newAnimation(grid(6,'6-7'), 1)
 end
 
 -- Create an initial game state (this persists between levels)
@@ -742,7 +700,7 @@ end
 
 endMove = function(ch)
   -- return to idle animation
-  ch.anim = ch.anims['stand']
+  ch.anim = ch.anims['chain-stand'] or ch.anims['stand']
   ch.flux = nil
 
   -- reduce panic (survivors)
@@ -766,10 +724,10 @@ startMove = function (ch, duration, dx, dy)
   ch.moving = true -- so movement can be locked
 
   -- set directional animation
-  if (dx == 1) then ch.anim = ch.anims['right']
-  elseif (dx == -1) then ch.anim = ch.anims['left']
-  elseif (dy == 1) then ch.anim = ch.anims['down']
-  elseif (dy == -1) then ch.anim = ch.anims['up'] end
+  if (dx == 1) then ch.anim = ch.anims['chain-right'] or ch.anims['right']
+  elseif (dx == -1) then ch.anim = ch.anims['chain-left'] or ch.anims['left']
+  elseif (dy == 1) then ch.anim = ch.anims['chain-down'] or ch.anims['down']
+  elseif (dy == -1) then ch.anim = ch.anims['chain-up'] or ch.anims['up'] end
 
   -- move to next tile
   ch.flux = flux.to(ch, duration, {x=ch.x+dx, y=ch.y+dy })

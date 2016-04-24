@@ -2,6 +2,8 @@ require "miniSound"           -- audio manager
 local anim8 = require "anim8" -- character animations
 local flux = require "flux"   -- movement tweening. Modified from standard
 
+local useJoysticks = false
+
 local state_titleScreen = require "state_titleScreen"
 local state_game = require "state_game"
 local state_levelEnd = require "state_levelEnd"
@@ -10,7 +12,7 @@ local state_pause = require "state_pause"
 
 local levelNames = {
   "tut_01.tmx", "tut_02.tmx", "tut_03.tmx", "tut_04.tmx",
-  "maze1.tmx", 
+  "maze1.tmx",
   "level1.tmx",
   "ztown.tmx", "hospital.tmx", "gauntlet.tmx", "ring.tmx", "rooftops.tmx",
   "maze1.tmx"
@@ -91,14 +93,16 @@ function exitGame ()
   CurrentGlobalState = state_titleScreen
 end
 
--- connect joysticks and gamepads
-function love.joystickadded(joystick)
-  currentJoystick = joystick
-end
+if useJoysticks then
+  -- connect joysticks and gamepads
+  function love.joystickadded(joystick)
+    currentJoystick = joystick
+  end
 
-function love.joystickremoved(joystick)
-  if (currentJoystick == joystick) then
-    currentJoystick = nil
+  function love.joystickremoved(joystick)
+    if (currentJoystick == joystick) then
+      currentJoystick = nil
+    end
   end
 end
 

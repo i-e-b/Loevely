@@ -262,6 +262,11 @@ Update = function(dt, _, connectedPad)
 
   if (dt < 0.5) and (not endLevelTransition) then -- don't count when paused or background
     currentGame.LevelTime = currentGame.LevelTime + dt -- drift, here we come!
+    if (player.chainsawTime > 0) then
+      player.chainsawTime = player.chainsawTime - dt
+    else
+      player.chainsawTime = 0
+    end
   end
 
   if (endLevelTransition) then return end
@@ -558,7 +563,7 @@ updateZombies = function()
       elseif (not zom.locked) and (bestCandidate.dist < 0.8) then -- should be 1, but give some near miss
         local chain = findInChain(player, bestCandidate.char)
         if (bestCandidate.char == player) then chain = player end
-        if (chain.chainsawTime and chain.chainsawTime > 0) then -- bye zombie
+        if chain and (chain.chainsawTime and chain.chainsawTime > 0) then -- bye zombie
           killZombie(zom)
         else -- feed the zombie
           if chain then
@@ -717,12 +722,6 @@ startMoveChain = function(ch, duration)
 end
 
 endMove = function(ch)
-  -- return to idle animation
-  if (ch.chainsawTime and ch.chainsawTime > 0) then
-    ch.anim = ch.anims['chain-stand']
-  else
-    ch.anim = ch.anims['stand']
-  end
   ch.flux = nil
 
   -- reduce panic (survivors)
@@ -733,9 +732,16 @@ endMove = function(ch)
 
   if (ch == player) then
     survivorPickupDetect()
-    coinPickupDetect()
+    stuffPickupDetect()
     local house = inSafeHouse(player)
     if house then escapeSurvivors(player, house) end
+  end
+
+  -- return to idle animation
+  if (ch.chainsawTime and ch.chainsawTime > 0) then
+    ch.anim = ch.anims['chain-stand']
+  else
+    ch.anim = ch.anims['stand']
   end
   ch.moving = false  -- unlock movement
 end
@@ -863,13 +869,21 @@ survivorEscapes = function(surv, index, safehouse)
   end
 end
 
-coinPickupDetect = function()
+stuffPickupDetect = function()
   for i=1, #coins do
     local coin = coins[i]
     if coin and sameTile(player, coin) then
       table.remove(coins, i)
       love.audio.play(assets.coinSnd)
       currentGame.Score = currentGame.Score + 10
+    end
+  end
+  for i=1, #weapons do
+    local weap = weapons[i]
+    if weap and sameTile(player, weap) then
+      table.remove(weapons, i)
+      -- chainsaw sound
+      player.chainsawTime = player.chainsawTime + 10;
     end
   end
 end

@@ -601,6 +601,9 @@ end
 killZombie = function(zombie)
   if zombie.flux then zombie.flux:stop() end -- they can be off-grid now
   currentGame.LevelZombiesMinced = currentGame.LevelZombiesMinced + 1
+  scoreFlash(100, zombie.x, zombie.y)
+  currentGame.Score = currentGame.Score + 100
+
   zombie.thinking = ''
   zombie.anim = zombie.anims['slain']
   zombie.moving = false
@@ -969,8 +972,14 @@ drawHUD = function()
   love.graphics.setColor(255, 255, 255, 255)
   love.graphics.print("Score: "..currentGame.Score, 10, 30, 0, 2)
 
-  centreSmallString(math.floor(currentGame.LevelTime), screenWidth/2, 30, 2)
-
+  if (player.chainsawTime > 0) then
+      love.graphics.setColor(255, 0, 0, 255)
+      local cd = string.match (player.chainsawTime..'.0', "%d+.%d")
+      centreSmallString(cd, screenWidth/2, 30, 4)
+  else
+    centreSmallString(math.floor(currentGame.LevelTime), screenWidth/2, 30, 2)
+  end
+  love.graphics.setColor(255, 255, 255, 255)
 
   gui.anims['remaining']:draw(assets.creepSheet, screenWidth-74, 14, 0, 4)
   rightAlignSmallString(table.getn(survivors), screenWidth-84, 30, 2)

@@ -28,7 +28,7 @@ Specifics
 * [x] brain munching
 * [x] level completion
 * [x] coins
-* [ ] weapons
+* [x] weapons
 * [x] tutorial levels
 * [x] title screen
 * [ ] gamepad config

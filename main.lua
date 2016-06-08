@@ -12,9 +12,10 @@ local state_pause = require "state_pause"
 
 local levelNames = {
   "tut_01.tmx", "tut_02.tmx", "tut_03.tmx", "tut_04.tmx",
+"maze2.tmx",
   "level1.tmx",
   "ztown.tmx", "hospital.tmx", "gauntlet.tmx", "ring.tmx", "rooftops.tmx",
-  "maze1.tmx"
+  "maze1.tmx", "maze2.tmx"
 }
 
 local screenWidth, screenHeight

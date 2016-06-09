@@ -17,7 +17,7 @@ local zombies = {}
 local survivors = {}
 local coins = {}
 local weapons = {}
-local gui = {anims={}, bloodTint = 255}
+local gui = {anims={}, bloodTint = 255, minceFlash=0}
 local FeedingDuration = 3 -- shorter is harder
 
 -- Position of touch buttons:
@@ -202,9 +202,11 @@ Draw = function()
     end
   end
 
+  local bloodTint = gui.bloodTint - gui.minceFlash
+
   -- scan through rows, draw back ground, then chars, then the fg row.
   for row = 1, currentLevel.rowsToDraw do
-    level.drawBgRow(row, currentLevel, mapOffset, gui.bloodTint)
+    level.drawBgRow(row, currentLevel, mapOffset, bloodTint)
     -- pick chars in slots
     if (charRows[row]) then
       for i=1, #charRows[row] do
@@ -212,7 +214,7 @@ Draw = function()
         if (char.color and not endLevelTransition) then -- tints
           love.graphics.setColor(char.color.r, char.color.g, char.color.b, 255)
         else
-          love.graphics.setColor(255, gui.bloodTint, gui.bloodTint, 255)
+          love.graphics.setColor(255, bloodTint, bloodTint, 255)
         end
         if (char.thinking) then
           centreSmallString(char.thinking,sceneX + (char.x+0.5)*zts,sceneY + (char.y+0.4)*zts,zoom/2)
@@ -227,7 +229,7 @@ Draw = function()
         )
       end
     end
-    level.drawFgRow(row, currentLevel, mapOffset, gui.bloodTint)
+    level.drawFgRow(row, currentLevel, mapOffset, bloodTint)
   end
 
   -- be nice to the gc, assuming it does fast gen 0
@@ -270,6 +272,8 @@ Update = function(dt, _, connectedPad)
   end
 
   if (endLevelTransition) then return end
+
+  gui.minceFlash = math.max(0, gui.minceFlash - (500 * dt));
 
   updateZombies()
   updateSurvivors()
@@ -602,6 +606,7 @@ killZombie = function(zombie)
   if zombie.flux then zombie.flux:stop() end -- they can be off-grid now
   currentGame.LevelZombiesMinced = currentGame.LevelZombiesMinced + 1
   scoreFlash(100, zombie.x, zombie.y)
+  gui.minceFlash = 255
   currentGame.Score = currentGame.Score + 100
 
   zombie.thinking = ''

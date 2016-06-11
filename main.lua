@@ -9,6 +9,7 @@ local state_game = require "state_game"
 local state_levelEnd = require "state_levelEnd"
 local state_finalScreen = require "state_finalScreen"
 local state_pause = require "state_pause"
+local state_configure = require "state_configure"
 
 local levelNames = {
   "tut_01.tmx", "tut_02.tmx", "tut_03.tmx", "tut_04.tmx",
@@ -53,17 +54,23 @@ function love.load()
   state_levelEnd.Initialise(assets)
   state_finalScreen.Initialise(assets)
   state_pause.Initialise(assets)
+  state_configure.Initialise(assets)
 
   love.handlers['gameResume'] = resumeGame
   love.handlers['gamePause'] = pauseGame
   love.handlers['gameExit'] = exitGame
   love.handlers['loadGame'] = loadGameAndSetState
   love.handlers['startTutorial'] = loadTutorial
+  love.handlers['runSetup'] = runSetup
 
   love.audio.mute()
   CurrentGlobalState = state_titleScreen
 end
 
+function runSetup()
+  state_configure.Reset()
+  CurrentGlobalState = state_configure
+end
 
 function loadTutorial ()
   GameState = state_game.CreateNewGameState()

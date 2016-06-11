@@ -1,5 +1,5 @@
 --[[
-  Load/New/Configure: the first screen on loading
+  Configure screen: change configuration
 ]]
 local flux = require "flux"   -- movement tweening. Modified from standard
 
@@ -11,7 +11,7 @@ local readyForInput
 local selection = 1
 
 local Initialise, Update, LoadState, Draw, Reset, triggerClick, triggerAction,
-rightAlignString, centreBigString, centreSmallString
+rightAlignString, centreBigString, centreSmallString, toggleAudio
 
 Initialise = function(coreAssets)
   readyForInput = false
@@ -73,15 +73,15 @@ end
 
 triggerAction = function ()
   if (selection == 1) then
-    love.event.push('loadGame', nil)
+    love.event.push('gameExit')
   elseif (selection == 2) then
-    -- TODO: load game from storage and set as current
+    toggleAudio()
   elseif (selection == 3) then
-    love.event.push('startTutorial')
+    -- gamepad
   elseif (selection == 4) then
-    love.event.push('runSetup')
+    -- keyboard
   elseif (selection == 5) then
-    love.event.quit()
+    -- ???
   end
 end
 
@@ -104,7 +104,11 @@ Draw = function()
   local xpos = screenWidth / 2
   love.graphics.setColor(255, 255, 255, 255)
 
-  local strs = {" New Game ", " Load Game ", " Tutorial ", " Configure ", " Quit "}
+  local audioState = "on"
+  if love.audio.isMuted() then audioState = "off" end
+
+  local strs = {" Back ", " Sounds (currently "..audioState..") ",
+    " Gamepad setup ", " Keyboard setup ", " ??? "}
   strs[selection] = "[" .. strs[selection] .. "]"
 
   for i=1,5 do
@@ -124,6 +128,13 @@ centreSmallString = function(str, x, y, scale)
   love.graphics.print(str, math.floor(x - w), math.floor(y), 0, scale)
 end
 
+toggleAudio = function()
+  if love.audio.isMuted() then
+    love.audio.unmute()
+  else
+    love.audio.mute()
+  end
+end
 
 return {
   Initialise = Initialise,

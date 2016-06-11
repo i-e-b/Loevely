@@ -73,4 +73,12 @@ do
       love.audio.stop(s.src)
     end
   end
+
+  function love.audio.unmute()
+    muted = false
+  end
+
+  function love.audio.isMuted()
+    return muted
+  end
 end

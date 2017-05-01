@@ -816,7 +816,7 @@ updateControl = function()
       end
       if (level.isPassable(currentLevel, player, dx, dy)) then
         player.moving = true
-        love.audio.replay(assets.walkSnd)
+        love.audio.replayJitter(assets.walkSnd)
         startMove(player, 1/player.speed, dx, dy)
       else
         dx =  0; dy = 0

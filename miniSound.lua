@@ -50,6 +50,14 @@ do
     play(src)
   end
 
+-- for very repetitive sounds, we can jitter
+-- the volume and pitch to make it less annoying
+  function love.audio.replayJitter(src)
+    src:setVolume(0.6 + (math.random() / 2))
+    src:setPitch(1 + (math.random() - 0.5))
+    love.audio.replay(src)
+  end
+
   function love.audio.loop(src, howMany, delay)
     if (muted) then return end
     play(src)

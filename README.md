@@ -34,3 +34,4 @@ Specifics
 * [ ] gamepad config
 * [ ] keypress config
 * [ ] bonuses for all survivors, all coins, fast times
+* [ ] difficulty settings (zombie speed and range?)

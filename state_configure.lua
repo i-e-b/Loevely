@@ -77,11 +77,11 @@ triggerAction = function ()
   elseif (selection == 2) then
     toggleAudio()
   elseif (selection == 3) then
-    -- gamepad
+    -- gamepad : trigger another screen/mode. Enable, up,down,left,right,trigger,escape
   elseif (selection == 4) then
-    -- keyboard
+    -- keyboard : same as gamepad, but can't disable
   elseif (selection == 5) then
-    -- ???
+    -- ??? Maybe revert to defaults?
   end
 end
 

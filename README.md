@@ -18,7 +18,7 @@ Basics
 * [x] Keyboard input
 * [x] Basic animation
 * [x] Sound
-* [ ] Music
+* [ ] Music? Maybe generative atmosphere sounds?
 * [x] Tile background
 * [x] AI / interactions
 * [ ] separate out control module
@@ -34,4 +34,4 @@ Specifics
 * [ ] gamepad config
 * [ ] keypress config
 * [ ] bonuses for all survivors, all coins, fast times
-* [ ] difficulty settings (zombie speed and range?)
+* [ ] difficulty settings

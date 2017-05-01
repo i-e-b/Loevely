@@ -2,14 +2,13 @@ require "miniSound"           -- audio manager
 local anim8 = require "anim8" -- character animations
 local flux = require "flux"   -- movement tweening. Modified from standard
 
-local useJoysticks = false
-
 local state_titleScreen = require "state_titleScreen"
 local state_game = require "state_game"
 local state_levelEnd = require "state_levelEnd"
 local state_finalScreen = require "state_finalScreen"
 local state_pause = require "state_pause"
 local state_configure = require "state_configure"
+local state_configureGamepad = require "state_configureGamepad"
 
 local levelNames = {
   "tut_01.tmx", "tut_02.tmx", "tut_03.tmx", "tut_04.tmx",
@@ -31,6 +30,9 @@ local keyDownCount = 0 -- helper for skip scenes
 -- Load non dynamic values
 function love.load()
   love.window.fullscreen = (love.system.getOS() == "Android")
+
+  assets.enableGamepad = true
+  assets.gamepadMap = {}
 
   assets.creepSheet = love.graphics.newImage("assets/creeps.png")
   assets.bigfont = love.graphics.newImageFont("assets/bigfont.png", "!$#*+,-.0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -54,6 +56,7 @@ function love.load()
   state_finalScreen.Initialise(assets)
   state_pause.Initialise(assets)
   state_configure.Initialise(assets)
+  state_configureGamepad.Initialise(assets)
 
   love.handlers['gameResume'] = resumeGame
   love.handlers['gamePause'] = pauseGame
@@ -61,6 +64,7 @@ function love.load()
   love.handlers['loadGame'] = loadGameAndSetState
   love.handlers['startTutorial'] = loadTutorial
   love.handlers['runSetup'] = runSetup
+  love.handlers['runSetupGamepad'] = runSetupGamepad
 
   love.audio.mute()
   CurrentGlobalState = state_titleScreen
@@ -69,6 +73,11 @@ end
 function runSetup()
   state_configure.Reset()
   CurrentGlobalState = state_configure
+end
+
+function runSetupGamepad()
+  state_configureGamepad.Reset()
+  CurrentGlobalState = state_configureGamepad
 end
 
 function loadTutorial ()
@@ -99,16 +108,14 @@ function exitGame ()
   CurrentGlobalState = state_titleScreen
 end
 
-if useJoysticks then
-  -- connect joysticks and gamepads
-  function love.joystickadded(joystick)
-    currentJoystick = joystick
-  end
+-- connect joysticks and gamepads
+function love.joystickadded(joystick)
+  currentJoystick = joystick
+end
 
-  function love.joystickremoved(joystick)
-    if (currentJoystick == joystick) then
-      currentJoystick = nil
-    end
+function love.joystickremoved(joystick)
+  if (currentJoystick == joystick) then
+    currentJoystick = nil
   end
 end
 
@@ -132,7 +139,9 @@ function love.update(dt)
     end
   end
 
-  CurrentGlobalState.Update(dt, keyDownCount, currentJoystick)
+  local activeStick = currentJoystick
+  if (not assets.enableGamepad) then activeStick = nil end
+  CurrentGlobalState.Update(dt, keyDownCount, activeStick)
 end
 
 -- Draw a frame
@@ -141,12 +150,12 @@ function love.draw()
 end
 
 function love.keypressed(key)
-  if key == 'escape' then pauseGame() end
   keyDownCount = keyDownCount + 1
+  if key == 'escape' then pauseGame() end
 end
 function love.joystickpressed(joystick,button)
-  if button == 10 then pauseGame() end
   keyDownCount = keyDownCount + 1
+  if button == 10 then pauseGame() end
 end
 function love.mousepressed( x, y, button, istouch )
   keyDownCount = keyDownCount + 1

@@ -2,6 +2,11 @@
 
 What happens when you mix pac-man and snake, then add zombies?
 
+# NOTE:
+
+This was built for Love2D `0.10.0`. It works with 11.2, but not perfectly. It needs *all* the colors to be changed from 0-255 range to 0-1 range.
+
+
 ## Things to change for difficulty:
 
 * Speed

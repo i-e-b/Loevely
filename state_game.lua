@@ -168,7 +168,7 @@ Draw = function()
   playerCentreX = (screenWidth / 2) - (zts / 2)
   playerCentreY = (screenHeight / 2) - (zts / 2)
 
-  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setColor(1, 1, 1, 1)
   local zoom = currentLevel.zoom
   local sceneX = mapOffset.x - zts * currentLevel.mapX
   local sceneY = mapOffset.y - zts * currentLevel.mapY
@@ -212,9 +212,9 @@ Draw = function()
       for i=1, #charRows[row] do
         local char = (charRows[row])[i]
         if (char.color and not endLevelTransition) then -- tints
-          love.graphics.setColor(char.color.r, char.color.g, char.color.b, 255)
+          love.graphics.setColor(char.color.r/255, char.color.g/255, char.color.b/255, 1)
         else
-          love.graphics.setColor(255, bloodTint, bloodTint, 255)
+          love.graphics.setColor(1, bloodTint/255, bloodTint/255, 1)
         end
         if (char.thinking) then
           centreSmallString(char.thinking,sceneX + (char.x+0.5)*zts,sceneY + (char.y+0.4)*zts,zoom/2)
@@ -237,7 +237,7 @@ Draw = function()
 
   -- draw any 'flashes'
   for i, flash in ipairs(flashes) do
-    love.graphics.setColor(255, 255, 255, (flash.alpha or 255))
+    love.graphics.setColor(1, 1, 1, (flash.alpha or 255)/255)
     if (flash.text) then
       centreSmallString(flash.text, sceneX + zts * (flash.x+0.5), sceneY + zts * flash.y, zoom / 2)
     end
@@ -971,20 +971,20 @@ end
 drawHUD = function()
   love.graphics.setFont(assets.smallfont)
 
-  love.graphics.setColor(255, 128, 0, 255)
+  love.graphics.setColor(1, 0.5, 0, 1)
   love.graphics.print("FPS: "..love.timer.getFPS(), 10, 5, 0, 1)
 
-  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setColor(1, 1, 1, 1)
   love.graphics.print("Score: "..currentGame.Score, 10, 30, 0, 2)
 
   if (player.chainsawTime > 0) then
-      love.graphics.setColor(255, 0, 0, 255)
+      love.graphics.setColor(1, 0, 0, 1)
       local cd = string.match (player.chainsawTime..'.0', "%d+.%d")
       centreSmallString(cd, screenWidth/2, 30, 4)
   else
     centreSmallString(math.floor(currentGame.LevelTime), screenWidth/2, 30, 2)
   end
-  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setColor(1, 1, 1, 1)
 
   gui.anims['remaining']:draw(assets.creepSheet, screenWidth-74, 14, 0, 4)
   rightAlignSmallString(table.getn(survivors), screenWidth-84, 30, 2)
@@ -998,7 +998,7 @@ end
 drawControlHints = function()
   if not isPhone then return end
   for itr = 0, 2 do
-    love.graphics.setColor(itr*70, itr*70, itr*70, 200)
+    love.graphics.setColor((itr*70)/255, (itr*70)/255, (itr*70)/255, 0.784)
     -- directions
     love.graphics.circle("line", buttons.up[1] + itr, buttons.up[2], 100, 4)
     love.graphics.circle("line", buttons.down[1] + itr, buttons.down[2], 100, 4)

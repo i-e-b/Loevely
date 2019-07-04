@@ -75,7 +75,7 @@ triggerClick = function(x,y)
 end
 
 Draw = function()
-  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setColor(1, 1, 1, 1)
 
   love.graphics.setFont(assets.bigfont)
   centreBigString("* PAUSED *", screenWidth / 2, 70, 2)

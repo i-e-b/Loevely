@@ -40,7 +40,7 @@ LoadState = function(gameState)
 end
 
 Draw = function()
-  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setColor(1, 1, 1, 1)
 
   love.graphics.setFont(assets.bigfont)
   centreBigString("* LEVEL COMPLETE *", screenWidth / 2, 70, 2)
@@ -51,9 +51,9 @@ Draw = function()
   local right = left + 48
 
   love.graphics.setFont(assets.smallfont)
-  love.graphics.setColor(170, 170, 170, 255)
+  love.graphics.setColor(0.66, 0.66, 0.66, 1)
   centreSmallString(continueMessage, screenWidth / 2, 120, 2)
-  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setColor(1, 1, 1, 1)
 
   rightAlignString("Score", left, height, 2)
   love.graphics.print(math.ceil(currentGame.Score), right, height, 0, 2)

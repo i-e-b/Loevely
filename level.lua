@@ -66,7 +66,7 @@ end
 
 drawBgRow = function(row, level, offsets, bloodTint)
   bloodTint = bloodTint or 255
-  love.graphics.setColor(255, bloodTint, bloodTint, 255)
+  love.graphics.setColor(1, bloodTint/255, bloodTint/255, 1)
   love.graphics.draw(level.bgBatch[row],
   math.floor(offsets.x - level.zoom * (level.mapX % 1) * level.tiles.size),
   math.floor(offsets.y - level.zoom * (level.mapY % 1) * level.tiles.size),
@@ -76,7 +76,7 @@ end
 drawFgRow = function(row, level, offsets, bloodTint)
   if not level.fgBatch[row] then return end
   bloodTint = bloodTint or 255
-  love.graphics.setColor(255, bloodTint, bloodTint, 255)
+  love.graphics.setColor(1, bloodTint/255, bloodTint/255, 1)
   love.graphics.draw(level.fgBatch[row],
   math.floor(offsets.x - level.zoom * (level.mapX % 1) * level.tiles.size),
   math.floor(offsets.y - level.zoom * (level.mapY % 1) * level.tiles.size),

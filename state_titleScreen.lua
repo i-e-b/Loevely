@@ -49,7 +49,7 @@ Update = function(dt, keyDownCount)
   -- MOUSE AND TOUCH: these activate immediately
   if love.mouse.isDown(1) then
     triggerClick(love.mouse.getPosition())
-	end
+  end
 
   local touches = love.touch.getTouches()
   for i, id in ipairs(touches) do
@@ -91,18 +91,18 @@ LoadState = function(gameState)
 end
 
 Draw = function()
-  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setColor(1, 1, 1, 1)
 
   love.graphics.setFont(assets.bigfont)
   centreBigString("SURVIVOR", screenWidth / 2, 70, 3)
 
   love.graphics.setFont(assets.smallfont)
-  love.graphics.setColor(170, 170, 170, 255)
+  love.graphics.setColor(0.66, 0.66, 0.66, 1)
   centreSmallString("snake meets pacman with zombies", screenWidth / 2, 120, 2)
 
   local height = 140
   local xpos = screenWidth / 2
-  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setColor(1, 1, 1, 1)
 
   local strs = {" New Game ", " Load Game ", " Tutorial ", " Configure ", " Quit "}
   strs[selection] = "[" .. strs[selection] .. "]"

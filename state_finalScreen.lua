@@ -26,7 +26,7 @@ Update = function(dt, keyDownCount)
     readyForContinue = true
   end
 
-  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setColor(1, 1, 1, 1)
 end
 
 LoadState = function(gameState)
@@ -43,7 +43,7 @@ Draw = function()
   local right = left + 48
 
   love.graphics.setFont(assets.smallfont)
-  love.graphics.setColor(255, 255, 255, 255)
+  love.graphics.setColor(1, 1, 1, 1)
 
   rightAlignString("Score", left, height, 2)
   love.graphics.print(math.ceil(currentGame.Score), right, height, 0, 2)

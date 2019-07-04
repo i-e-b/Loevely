@@ -1,5 +1,5 @@
 function love.conf(t)
-  t.version = "0.10.0"  -- The LÖVE version this game was built with
+  t.version = "11.2"  -- The LÖVE version this game was built with
 
   -- Same resolution as my phone. Independence later!
   t.window.width = 1312

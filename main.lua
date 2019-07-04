@@ -39,12 +39,12 @@ function love.load()
   assets.smallfont = love.graphics.newImageFont("assets/smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]>")
 
   -- static only for small short and repeated sounds
-  assets.munchSnd = love.audio.newSource("assets/munch.wav")
-  assets.pickupSnd = love.audio.newSource("assets/pickup.wav")
-  assets.shoveSnd = love.audio.newSource("assets/shove.wav")
-  assets.saveSnd = love.audio.newSource("assets/save.wav")
-  assets.walkSnd = love.audio.newSource("assets/walk.wav")
-  assets.coinSnd = love.audio.newSource("assets/coin.wav")
+  assets.munchSnd = love.audio.newSource("assets/munch.wav", "static")
+  assets.pickupSnd = love.audio.newSource("assets/pickup.wav", "static")
+  assets.shoveSnd = love.audio.newSource("assets/shove.wav", "static")
+  assets.saveSnd = love.audio.newSource("assets/save.wav", "static")
+  assets.walkSnd = love.audio.newSource("assets/walk.wav", "static")
+  assets.coinSnd = love.audio.newSource("assets/coin.wav", "static")
 
   assets.creepSheet:setFilter("linear", "nearest") -- pixel art scaling: linear down, nearest up
   assets.bigfont:setFilter("linear", "nearest")
